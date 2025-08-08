@@ -6,8 +6,10 @@ if __name__ == '__main__':
     mediator = get_mediator()
 
     song = mediator.send(CreateSongCommand(
-        origin='https://google.com'
+        origin='https://www.youtube.com/watch?v=dQw4w9WgXcQ'
     ))
+
+    print(song)
 
     song_from_db = mediator.send(GetSongByIdQuery(
         id=song.id
