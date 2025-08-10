@@ -2,6 +2,7 @@ from dataclasses import dataclass, asdict
 
 from backend.application.dtos.song_create_dto import SongCreateDTO
 from backend.application.dtos.song_create_response_dto import SongCreateResponseDTO
+from backend.application.factories.song_metadata_provider_factory import SongMetadataProviderFactory
 from backend.application.factories.url_parser_factory import UrlParserFactory
 from backend.application.utils.mediator import Request, RequestHandler
 from backend.domain.models.song import Song
@@ -24,12 +25,13 @@ class CreateSongCommandHandler(RequestHandler[CreateSongCommand, SongCreateRespo
 
     def handle(self, request: CreateSongCommand) -> SongCreateResponseDTO:
         song_id = UrlParserFactory.create(request.origin).get_id()
+        song_meta = SongMetadataProviderFactory.create(request.origin).get_meta(song_id)
 
         song = Song(
             id=song_id,
             origin=request.origin,
-            length=420,
-            title='Never gonna give you up'
+            length=song_meta.length,
+            title=song_meta.title
         )
 
         self.__song_repository.create(song)
