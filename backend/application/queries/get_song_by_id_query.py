@@ -1,4 +1,4 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Optional
 
 from backend.application.dtos.song_get_dto import SongGetDTO
@@ -28,5 +28,8 @@ class GetSongByIdQueryHandler(RequestHandler[GetSongByIdQuery, SongGetResponseDT
             return None
 
         return SongGetResponseDTO(
-            **asdict(song)
+            id= song.id,
+            origin=song.origin,
+            title=song.title,
+            length=song.length
         )

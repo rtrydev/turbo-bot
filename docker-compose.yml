@@ -1,0 +1,68 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend
+    depends_on:
+      - mongo
+      - seaweed-master
+      - seaweed-volume
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/turbo-bot
+      - SEAWEEDFS_URL=seaweed-master:9333
+      - RABBITMQ_DEFAULT_USER=rabbitmq
+      - RABBITMQ_DEFAULT_PASS=mqpassword
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  seaweed-master:
+    image: chrislusf/seaweedfs
+    container_name: seaweed-master
+    command: "master -ip=seaweed-master -port=9333"
+    ports:
+      - "9333:9333"
+    volumes:
+      - seaweed_master_data:/data
+
+  seaweed-volume:
+    image: chrislusf/seaweedfs
+    container_name: seaweed-volume
+    command: "volume -ip=seaweed-volume -mserver=seaweed-master:9333 -port=8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - seaweed_volume_data:/data
+
+  seaweed-filer:
+    image: chrislusf/seaweedfs
+    container_name: seaweed-filer
+    command: "filer -master=seaweed-master:9333"
+    ports:
+      - "8888:8888"
+    volumes:
+      - seaweed_filer_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: rabbitmq
+      RABBITMQ_DEFAULT_PASS: mqpassword
+
+volumes:
+  mongo_data:
+  seaweed_master_data:
+  seaweed_volume_data:
+  seaweed_filer_data:
