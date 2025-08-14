@@ -12,3 +12,7 @@ class SongRepository(ABC):
     @abstractmethod
     def get_by_id(self, _id: str) -> Optional[Song]:
         pass
+
+    @abstractmethod
+    def update(self, song: Song) -> None:
+        pass

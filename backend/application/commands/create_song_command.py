@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, asdict
 
 from backend.application.dtos.song_create_dto import SongCreateDTO
 from backend.application.dtos.song_create_response_dto import SongCreateResponseDTO
@@ -7,11 +8,13 @@ from backend.application.factories.url_parser_factory import UrlParserFactory
 from backend.application.utils.mediator import Request, RequestHandler
 from backend.domain.models.song import Song
 from backend.domain.repositories.song_repository import SongRepository
-from backend.domain.services.media_download_service import MediaDownloadService
+from backend.domain.services.download_queue_service import DownloadQueueService
 
 
 @dataclass
 class CreateSongCommand(Request[SongCreateResponseDTO], SongCreateDTO):
+    origin: str
+
     @staticmethod
     def from_dto(schema: SongCreateDTO) -> 'CreateSongCommand':
         return CreateSongCommand(
@@ -20,11 +23,11 @@ class CreateSongCommand(Request[SongCreateResponseDTO], SongCreateDTO):
 
 class CreateSongCommandHandler(RequestHandler[CreateSongCommand, SongCreateResponseDTO]):
     __song_repository: SongRepository
-    __media_download_service: MediaDownloadService
+    __download_queue_service: DownloadQueueService
 
-    def __init__(self, song_repository: SongRepository, media_download_service: MediaDownloadService):
+    def __init__(self, song_repository: SongRepository, download_queue_service: DownloadQueueService):
         self.__song_repository = song_repository
-        self.__media_download_service = media_download_service
+        self.__download_queue_service = download_queue_service
 
     def handle(self, request: CreateSongCommand) -> SongCreateResponseDTO:
         song_id = UrlParserFactory.create(request.origin).get_id()
@@ -39,7 +42,9 @@ class CreateSongCommandHandler(RequestHandler[CreateSongCommand, SongCreateRespo
         )
 
         self.__song_repository.create(song)
-        song.fid = self.__media_download_service.download_song(song) # todo: do this asynchronously
+        self.__download_queue_service.send_message(
+            json.dumps(asdict(song))
+        )
 
         return SongCreateResponseDTO(
             id=song.id,

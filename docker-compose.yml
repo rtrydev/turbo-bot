@@ -4,15 +4,32 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: backend
+    image: turbo-bot-backend
     depends_on:
       - mongo
       - seaweed-master
       - seaweed-volume
+      - rabbitmq
     environment:
       - MONGO_URI=mongodb://mongo:27017/turbo-bot
       - SEAWEEDFS_URL=seaweed-master:9333
       - RABBITMQ_DEFAULT_USER=rabbitmq
       - RABBITMQ_DEFAULT_PASS=mqpassword
+
+  download-handler:
+    image: turbo-bot-backend
+    container_name: download-handler
+    depends_on:
+      - mongo
+      - seaweed-master
+      - seaweed-volume
+      - rabbitmq
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/turbo-bot
+      - SEAWEEDFS_URL=seaweed-master:9333
+      - RABBITMQ_DEFAULT_USER=rabbitmq
+      - RABBITMQ_DEFAULT_PASS=mqpassword
+    entrypoint: ["python", "-m", "backend.ports.queue.download_handler"]
 
   mongo:
     image: mongo:6.0

@@ -22,3 +22,9 @@ class InMemorySongRepository(SongRepository):
             )
         except StopIteration:
             return None
+
+    def update(self, song: Song) -> None:
+        for i, existing_song in enumerate(self.__store):
+            if existing_song.id == song.id:
+                self.__store[i] = song
+                return

@@ -9,6 +9,8 @@ from backend.domain.repositories.song_repository import SongRepository
 
 @dataclass
 class GetSongByIdQuery(Request[Optional[SongGetResponseDTO]], SongGetDTO):
+    id: str
+
     @staticmethod
     def from_dto(schema: SongGetDTO) -> 'GetSongByIdQuery':
         return GetSongByIdQuery(
