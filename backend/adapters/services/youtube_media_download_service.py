@@ -25,24 +25,27 @@ class YoutubeMediaDownloadService(MediaDownloadService):
                 'outtmpl': tmp_path_template,
                 'quiet': True,
                 'no_warnings': True,
-                'extract_audio': True,
-                'audio_format': 'mp3',
                 'logtostderr': False,
                 'force_overwrites': True,
                 'prefer_ffmpeg': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
+                    'preferredcodec': 'opus',
+                    'preferredquality': '192'
                 }],
+                'postprocessor_args': [
+                    '-ar', '48000',
+                    '-ac', '2',
+                    '-f', 'opus'
+                ]
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(song.origin, download=True)
                 filename = ydl.prepare_filename(info)
-                mp3_path = os.path.splitext(filename)[0] + '.mp3'
+                opus_path = os.path.splitext(filename)[0] + '.opus'
 
-            with open(mp3_path, 'rb') as f:
+            with open(opus_path, 'rb') as f:
                 audio_bytes = f.read()
 
             return self.__filesystem_service.save_file(song.id, audio_bytes)
@@ -50,21 +53,31 @@ class YoutubeMediaDownloadService(MediaDownloadService):
     def get_audio_stream(self, song: Song) -> Generator[bytes, None, None]:
         process = subprocess.Popen(
             [
-                "yt-dlp",
-                "-f", "bestaudio/best",
-                "--extract-audio",
-                "--audio-format", "mp3",
-                "-o", "-",
+                'yt-dlp',
+                '-f', 'bestaudio',
+                '-o', '-',
                 song.origin
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL
+            stdout=subprocess.PIPE
         )
 
-        if not process.stdout:
+        ffmpeg_process = subprocess.Popen(
+            [
+                'ffmpeg',
+                '-i', 'pipe:0',
+                '-f', 'opus',
+                '-ar', '48000',
+                '-ac', '2',
+                'pipe:1'
+            ],
+            stdin=process.stdout,
+            stdout=subprocess.PIPE
+        )
+
+        if not ffmpeg_process.stdout:
             return
 
-        for chunk in iter(lambda: process.stdout.read(4096), b""):
+        for chunk in iter(lambda: ffmpeg_process.stdout.read(3840), b''):
             yield chunk
 
         process.stdout.close()
