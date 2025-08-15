@@ -11,7 +11,7 @@ services:
       - seaweed-volume
       - rabbitmq
     environment:
-      - MONGO_URI=mongodb://mongo:27017/turbo-bot
+      - MONGO_URI=mongodb://mongo:27017
       - SEAWEEDFS_URL=seaweed-master:9333
       - RABBITMQ_DEFAULT_USER=rabbitmq
       - RABBITMQ_DEFAULT_PASS=mqpassword
@@ -26,7 +26,7 @@ services:
       - seaweed-volume
       - rabbitmq
     environment:
-      - MONGO_URI=mongodb://mongo:27017/turbo-bot
+      - MONGO_URI=mongodb://mongo:27017
       - SEAWEEDFS_URL=seaweed-master:9333
       - RABBITMQ_DEFAULT_USER=rabbitmq
       - RABBITMQ_DEFAULT_PASS=mqpassword
