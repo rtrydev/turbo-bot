@@ -1,6 +1,7 @@
 import os
+import subprocess
 import tempfile
-from typing import Optional
+from typing import Optional, Generator
 
 import yt_dlp
 
@@ -45,3 +46,26 @@ class YoutubeMediaDownloadService(MediaDownloadService):
                 audio_bytes = f.read()
 
             return self.__filesystem_service.save_file(song.id, audio_bytes)
+
+    def get_audio_stream(self, song: Song) -> Generator[bytes, None, None]:
+        process = subprocess.Popen(
+            [
+                "yt-dlp",
+                "-f", "bestaudio/best",
+                "--extract-audio",
+                "--audio-format", "mp3",
+                "-o", "-",
+                song.origin
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL
+        )
+
+        if not process.stdout:
+            return
+
+        for chunk in iter(lambda: process.stdout.read(4096), b""):
+            yield chunk
+
+        process.stdout.close()
+        process.wait()

@@ -10,6 +10,8 @@ from backend.adapters.services.seaweedfs_filesystem_service import SeaweedfsFile
 from backend.adapters.services.youtube_media_download_service import YoutubeMediaDownloadService
 from backend.application.commands.create_song_command import CreateSongCommand, CreateSongCommandHandler
 from backend.application.commands.download_song_command import DownloadSongCommand, DownloadSongCommandHandler
+from backend.application.providers.saved_audio_provider import SavedAudioProvider
+from backend.application.providers.stream_audio_provider import StreamAudioProvider
 from backend.application.queries.get_song_by_id_query import GetSongByIdQuery, GetSongByIdQueryHandler
 from backend.application.utils.mediator import Mediator
 from backend.domain.repositories.song_repository import SongRepository
@@ -32,6 +34,8 @@ def get_mediator() -> Mediator:
     container.register(FilesystemService, lambda: SeaweedfsFilesystemService(*seaweedfs_url.split(':')), scope=Scope.singleton)
     container.register(MediaDownloadService, YoutubeMediaDownloadService)
 
+    container.register(SavedAudioProvider)
+    container.register(StreamAudioProvider)
     container.register(YoutubeSongMetadataProvider)
 
     return Mediator()\
