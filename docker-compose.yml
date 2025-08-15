@@ -37,7 +37,7 @@ services:
     entrypoint: ["python", "-m", "backend.ports.queue.download_handler"]
 
   mongo:
-    image: mongo:6.0
+    image: mongo:4.4.18
     container_name: mongo
     restart: always
     ports:
