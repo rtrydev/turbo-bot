@@ -5,6 +5,7 @@ from pymongo import MongoClient
 
 from backend.adapters.providers.youtube_song_metadata_provider import YoutubeSongMetadataProvider
 from backend.adapters.repositories.mongo.mongodb_song_repository import MongoDBSongRepository
+from backend.adapters.services.in_memory_context_manager_service import InMemoryContextManagerService
 from backend.adapters.services.rabbitmq_download_queue_service import RabbitMQDownloadQueueService
 from backend.adapters.services.seaweedfs_filesystem_service import SeaweedfsFilesystemService
 from backend.adapters.services.youtube_media_download_service import YoutubeMediaDownloadService
@@ -15,6 +16,7 @@ from backend.application.providers.stream_audio_provider import StreamAudioProvi
 from backend.application.queries.get_song_by_id_query import GetSongByIdQuery, GetSongByIdQueryHandler
 from backend.application.utils.mediator import Mediator
 from backend.domain.repositories.song_repository import SongRepository
+from backend.domain.services.context_manager_service import ContextManagerService
 from backend.domain.services.download_queue_service import DownloadQueueService
 from backend.domain.services.filesystem_service import FilesystemService
 from backend.domain.services.media_download_service import MediaDownloadService
@@ -33,6 +35,7 @@ def get_mediator() -> Mediator:
     container.register(DownloadQueueService, lambda: RabbitMQDownloadQueueService(rabbitmq_user, rabbitmq_password), scope=Scope.singleton)
     container.register(FilesystemService, lambda: SeaweedfsFilesystemService(*seaweedfs_url.split(':')), scope=Scope.singleton)
     container.register(MediaDownloadService, YoutubeMediaDownloadService)
+    container.register(ContextManagerService, InMemoryContextManagerService, scope=Scope.singleton)
 
     container.register(SavedAudioProvider)
     container.register(StreamAudioProvider)
