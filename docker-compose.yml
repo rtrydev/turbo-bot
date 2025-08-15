@@ -11,10 +11,10 @@ services:
       - seaweed-volume
       - rabbitmq
     environment:
-      - MONGO_URI=mongodb://mongo:27017
-      - SEAWEEDFS_URL=seaweed-master:9333
-      - RABBITMQ_DEFAULT_USER=rabbitmq
-      - RABBITMQ_DEFAULT_PASS=mqpassword
+      - MONGO_URI=${MONGO_URI}
+      - SEAWEEDFS_URL=${SEAWEEDFS_URL}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
       - PYTHONUNBUFFERED=1
 
   download-handler:
@@ -26,10 +26,10 @@ services:
       - seaweed-volume
       - rabbitmq
     environment:
-      - MONGO_URI=mongodb://mongo:27017
-      - SEAWEEDFS_URL=seaweed-master:9333
-      - RABBITMQ_DEFAULT_USER=rabbitmq
-      - RABBITMQ_DEFAULT_PASS=mqpassword
+      - MONGO_URI=${MONGO_URI}
+      - SEAWEEDFS_URL=${SEAWEEDFS_URL}
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_DEFAULT_PASS}
       - PYTHONUNBUFFERED=1
     entrypoint: ["python", "-m", "backend.ports.queue.download_handler"]
 
@@ -77,8 +77,8 @@ services:
       - "5672:5672"
       - "15672:15672"
     environment:
-      RABBITMQ_DEFAULT_USER: rabbitmq
-      RABBITMQ_DEFAULT_PASS: mqpassword
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
 
 volumes:
   mongo_data:
