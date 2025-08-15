@@ -13,5 +13,13 @@ class MediaPlayerService(ABC):
         pass
 
     @abstractmethod
+    def resume(self) -> None:
+        pass
+
+    @abstractmethod
     def stop(self) -> None:
+        pass
+
+    @abstractmethod
+    def next(self) -> None:
         pass

@@ -6,6 +6,7 @@ import discord
 from backend.application.factories.audio_provider_factory import AudioProviderFactory
 from backend.domain.models.song import Song
 from backend.domain.providers.channel_connection_provider import ChannelConnectionProvider
+from backend.domain.services.context_manager_service import ContextManagerService
 from backend.domain.services.media_player_service import MediaPlayerService
 
 
@@ -29,9 +30,11 @@ class GeneratorAudioSource(discord.AudioSource):
 
 class DiscordMediaPlayerService(MediaPlayerService):
     __channel_connection_provider: ChannelConnectionProvider
+    __context_manager_service: ContextManagerService
 
-    def __init__(self, channel_connection_provider: ChannelConnectionProvider) -> None:
+    def __init__(self, channel_connection_provider: ChannelConnectionProvider, context_manager_service: ContextManagerService) -> None:
         self.__channel_connection_provider = channel_connection_provider
+        self.__context_manager_service = context_manager_service
 
     def play(self, song: Song) -> None:
         audio_provider = AudioProviderFactory.create_audio_provider(song)
@@ -57,6 +60,21 @@ class DiscordMediaPlayerService(MediaPlayerService):
         channel = self.__channel_connection_provider.get_channel_connection()
         channel.pause()
 
+    def resume(self) -> None:
+        channel = self.__channel_connection_provider.get_channel_connection()
+        channel.resume()
+
     def stop(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
         channel.stop()
+
+    def next(self) -> None:
+        channel = self.__channel_connection_provider.get_channel_connection()
+
+        if channel.is_playing():
+            channel.stop()
+
+        next_song = self.__context_manager_service.get_queue_state().get_next()
+
+        if next_song:
+            self.play(next_song)

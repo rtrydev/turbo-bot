@@ -12,8 +12,18 @@ from backend.adapters.services.in_memory_context_manager_service import InMemory
 from backend.adapters.services.rabbitmq_download_queue_service import RabbitMQDownloadQueueService
 from backend.adapters.services.seaweedfs_filesystem_service import SeaweedfsFilesystemService
 from backend.adapters.services.youtube_media_download_service import YoutubeMediaDownloadService
+from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand, AddSongToQueueCommandHandler
 from backend.application.commands.create_song_command import CreateSongCommand, CreateSongCommandHandler
 from backend.application.commands.download_song_command import DownloadSongCommand, DownloadSongCommandHandler
+from backend.application.commands.join_channel_command import JoinChannelCommand, JoinChannelCommandHandler
+from backend.application.commands.leave_channel_command import LeaveChannelCommand, LeaveChannelCommandHandler
+from backend.application.commands.pause_song_command import PauseSongCommand, PauseSongCommandHandler
+from backend.application.commands.resume_song_command import ResumeSongCommand, ResumeSongCommandHandler
+from backend.application.commands.skip_song_in_queue_command import SkipSongInQueueCommand, \
+    SkipSongInQueueCommandHandler
+from backend.application.commands.start_queue_playback_command import StartQueuePlaybackCommand, \
+    StartQueuePlaybackCommandHandler
+from backend.application.commands.toggle_repeat_command import ToggleRepeatCommand, ToggleRepeatCommandHandler
 from backend.application.providers.saved_audio_provider import SavedAudioProvider
 from backend.application.providers.stream_audio_provider import StreamAudioProvider
 from backend.application.queries.get_song_by_id_query import GetSongByIdQuery, GetSongByIdQueryHandler
@@ -63,4 +73,12 @@ def get_mediator(discord_connect=False) -> Mediator:
     return Mediator()\
         .register(CreateSongCommand, CreateSongCommandHandler)\
         .register(GetSongByIdQuery, GetSongByIdQueryHandler)\
-        .register(DownloadSongCommand, DownloadSongCommandHandler)
+        .register(DownloadSongCommand, DownloadSongCommandHandler)\
+        .register(AddSongToQueueCommand, AddSongToQueueCommandHandler)\
+        .register(JoinChannelCommand, JoinChannelCommandHandler)\
+        .register(LeaveChannelCommand, LeaveChannelCommandHandler)\
+        .register(PauseSongCommand, PauseSongCommandHandler)\
+        .register(ResumeSongCommand, ResumeSongCommandHandler)\
+        .register(SkipSongInQueueCommand, SkipSongInQueueCommandHandler)\
+        .register(StartQueuePlaybackCommand, StartQueuePlaybackCommandHandler)\
+        .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)

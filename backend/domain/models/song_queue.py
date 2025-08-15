@@ -44,3 +44,6 @@ class SongQueue:
 
     def toggle_repeat(self) -> None:
         self.__repeat = not self.__repeat
+
+    def skip(self) -> None:
+        self.__last_song = None
