@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from backend.application.dtos.song_download_dto import SongDownloadDTO
+from backend.application.errors.song_already_downloaded_error import SongAlreadyDownloadedError
 from backend.application.utils.mediator import Request, RequestHandler
 from backend.domain.repositories.song_repository import SongRepository
 from backend.domain.services.media_download_service import MediaDownloadService
@@ -33,7 +34,7 @@ class DownloadSongCommandHandler(RequestHandler[DownloadSongCommand, None]):
             raise Exception(f'Song with id {request.id} not found')
 
         if song.fid is not None:
-            raise Exception(f'Song with id {request.id} is already downloaded')
+            raise SongAlreadyDownloadedError(request.id)
 
         song.fid = self.__media_download_service.download_song(song)
         self.__song_repository.update(song)

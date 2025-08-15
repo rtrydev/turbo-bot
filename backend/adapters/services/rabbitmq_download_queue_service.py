@@ -1,3 +1,4 @@
+import json
 import time
 from typing import Callable
 
@@ -5,6 +6,7 @@ import pika
 from pika.adapters.blocking_connection import BlockingChannel, BlockingConnection
 from pika.exceptions import AMQPConnectionError
 
+from backend.domain.errors.permanent_error import PermanentError
 from backend.domain.services.download_queue_service import DownloadQueueService
 
 
@@ -21,9 +23,37 @@ class RabbitMQDownloadQueueService(DownloadQueueService):
         connection = self.__get_connection()
 
         channel = self.__get_channel(connection)
+
+        def handler(ch, method, properties, body) -> None:
+            headers = properties.headers or {}
+            death_info = headers.get('x-death', [])
+
+            retry_count = 0
+            if death_info:
+                retry_count = death_info[0].get('count', 0)
+
+            print(f'Received message: {body}, Retry count: {retry_count}')
+            song_dict = json.loads(body)
+
+            try:
+                callback(song_dict)
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except PermanentError as e:
+                print(f'Encountered permanent error, skipping retry: {e}')
+                ch.basic_ack(delivery_tag=method.delivery_tag)
+            except Exception as e:
+                print(f'Error processing message: {e}')
+
+                if retry_count < 3:
+                    print(f'Failing message, will retry (count={retry_count + 1})')
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+                else:
+                    print('Max retries reached, moving to dead-letter queue')
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+
         channel.basic_consume(
             queue=self.__queue_name,
-            on_message_callback=callback,
+            on_message_callback=handler,
             auto_ack=False
         )
         channel.start_consuming()
