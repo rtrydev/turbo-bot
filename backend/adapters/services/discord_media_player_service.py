@@ -44,11 +44,9 @@ class DiscordMediaPlayerService(MediaPlayerService):
             raise Exception(f'Audio stream for song {song.id} could not be created!')
 
         channel = self.__channel_connection_provider.get_channel_connection()
-        stream = audio_provider.get_audio(song)
-
         temp_file = tempfile.NamedTemporaryFile(suffix='.opus', delete=False)
 
-        for chunk in stream:
+        for chunk in audio_stream:
             temp_file.write(chunk)
 
         temp_file.flush()

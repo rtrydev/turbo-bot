@@ -24,7 +24,7 @@ async def on_ready():
     await tree_cls.sync(guild=discord.Object(id=os.environ.get('DISCORD_GUILD_ID')))
     print(f'Available commands: {", ".join([cmd.name for cmd in tree_cls.get_commands()])}')
 
-@tree_cls.command(name='add')
+@tree_cls.command(name='add', description='Add a song to the queue by providing a URL.')
 async def add(interaction: discord.Interaction, url: str):
     await interaction.response.defer(ephemeral=True)
 
@@ -36,7 +36,7 @@ async def add(interaction: discord.Interaction, url: str):
     except Exception as e:
         await interaction.followup.send(f'Error adding song: {str(e)}')
 
-@tree_cls.command(name='join')
+@tree_cls.command(name='join', description='Join a voice channel.')
 async def join(interaction: discord.Interaction):
     if interaction.user.voice is None:
         await interaction.response.send_message('You need to be in a voice channel to use this command.')
@@ -50,7 +50,7 @@ async def join(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f'Error joining channel: {str(e)}')
 
-@tree_cls.command(name='leave')
+@tree_cls.command(name='leave', description='Leave the current voice channel.')
 async def leave(interaction: discord.Interaction):
     if interaction.guild.voice_client is None:
         await interaction.response.send_message('I am not connected to a voice channel.')
@@ -62,7 +62,7 @@ async def leave(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f'Error leaving channel: {str(e)}')
 
-@tree_cls.command(name='start')
+@tree_cls.command(name='start', description='Start playing the song from the queue.')
 async def start(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
 
@@ -72,7 +72,7 @@ async def start(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f'Error starting playback: {str(e)}')
 
-@tree_cls.command(name='pause')
+@tree_cls.command(name='pause', description='Pause the current playback.')
 async def pause(interaction: discord.Interaction):
     try:
         mediator.send(PauseSongCommand())
@@ -80,7 +80,7 @@ async def pause(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f'Error pausing playback: {str(e)}')
 
-@tree_cls.command(name='resume')
+@tree_cls.command(name='resume', description='Resume the current playback.')
 async def resume(interaction: discord.Interaction):
     try:
         mediator.send(ResumeSongCommand())
@@ -88,15 +88,17 @@ async def resume(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f'Error resuming playback: {str(e)}')
 
-@tree_cls.command(name='skip')
+@tree_cls.command(name='skip', description='Skip the current song and play the next one in the queue.')
 async def skip(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
     try:
         mediator.send(SkipSongInQueueCommand())
-        await interaction.response.send_message('Skipped to the next song in the queue.')
+        await interaction.followup.send('Skipped to the next song in the queue.')
     except Exception as e:
-        await interaction.response.send_message(f'Error skipping song: {str(e)}')
+        await interaction.followup.send(f'Error skipping song: {str(e)}')
 
-@tree_cls.command(name='repeat')
+@tree_cls.command(name='repeat', description='Toggle repeat mode for the current song.')
 async def repeat(interaction: discord.Interaction):
     try:
         mediator.send(ToggleRepeatCommand())
