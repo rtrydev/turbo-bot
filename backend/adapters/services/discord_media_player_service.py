@@ -52,7 +52,10 @@ class DiscordMediaPlayerService(MediaPlayerService):
         temp_file.flush()
         temp_file.seek(0)
 
-        channel.play(discord.FFmpegOpusAudio(temp_file.name))
+        channel.play(
+            discord.FFmpegOpusAudio(temp_file.name),
+            after=lambda _: self.next()
+        )
 
     def pause(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
