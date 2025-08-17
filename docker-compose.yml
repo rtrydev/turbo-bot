@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: backend
+    restart: unless-stopped
     image: turbo-bot-backend
     depends_on:
       - mongo
@@ -23,6 +24,7 @@ services:
   download-handler:
     image: turbo-bot-backend
     container_name: download-handler
+    restart: unless-stopped
     depends_on:
       - mongo
       - seaweed-master
@@ -39,7 +41,7 @@ services:
   mongo:
     image: mongo:4.4.18
     container_name: mongo
-    restart: always
+    restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
@@ -48,6 +50,7 @@ services:
   seaweed-master:
     image: chrislusf/seaweedfs
     container_name: seaweed-master
+    restart: unless-stopped
     command: "master -ip=seaweed-master -port=9333"
     ports:
       - "9333:9333"
@@ -57,6 +60,7 @@ services:
   seaweed-volume:
     image: chrislusf/seaweedfs
     container_name: seaweed-volume
+    restart: unless-stopped
     command: "volume -ip=seaweed-volume -mserver=seaweed-master:9333 -port=8080"
     ports:
       - "8080:8080"
@@ -66,6 +70,7 @@ services:
   seaweed-filer:
     image: chrislusf/seaweedfs
     container_name: seaweed-filer
+    restart: unless-stopped
     command: "filer -master=seaweed-master:9333"
     ports:
       - "8888:8888"
@@ -75,7 +80,7 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     container_name: rabbitmq
-    restart: always
+    restart: unless-stopped
     ports:
       - "5672:5672"
       - "15672:15672"
