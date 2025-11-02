@@ -6,6 +6,7 @@ import discord
 from backend.application.factories.audio_provider_factory import AudioProviderFactory
 from backend.domain.models.song import Song
 from backend.domain.providers.channel_connection_provider import ChannelConnectionProvider
+from backend.domain.repositories.song_repository import SongRepository
 from backend.domain.services.context_manager_service import ContextManagerService
 from backend.domain.services.media_player_service import MediaPlayerService
 
@@ -31,12 +32,18 @@ class GeneratorAudioSource(discord.AudioSource):
 class DiscordMediaPlayerService(MediaPlayerService):
     __channel_connection_provider: ChannelConnectionProvider
     __context_manager_service: ContextManagerService
+    __song_repository: SongRepository
 
-    def __init__(self, channel_connection_provider: ChannelConnectionProvider, context_manager_service: ContextManagerService) -> None:
+    def __init__(self, channel_connection_provider: ChannelConnectionProvider, context_manager_service: ContextManagerService, song_repository: SongRepository) -> None:
         self.__channel_connection_provider = channel_connection_provider
         self.__context_manager_service = context_manager_service
+        self.__song_repository = song_repository
 
     def play(self, song: Song) -> None:
+        if song.fid is None:
+            db_song = self.__song_repository.get_by_id(song.id)
+            song.fid = db_song.fid
+
         audio_provider = AudioProviderFactory.create_audio_provider(song)
         audio_stream = audio_provider.get_audio(song)
 
