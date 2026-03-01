@@ -22,7 +22,10 @@ tree_cls = discord.app_commands.CommandTree(client)
 @client.event
 async def on_ready():
     print(f'Logged in to the guild as {client.user}')
-    await tree_cls.sync(guild=discord.Object(id=os.environ.get('DISCORD_GUILD_ID')))
+    await tree_cls.sync()
+
+    guild = discord.Object(id=os.environ.get('DISCORD_GUILD_ID'))
+    await tree_cls.sync(guild=guild)
     print(f'Available commands: {", ".join([cmd.name for cmd in tree_cls.get_commands()])}')
 
 @tree_cls.command(name='add', description='Add a song to the queue by providing a URL.')
