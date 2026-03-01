@@ -39,5 +39,19 @@ class MongoDBSongRepository(SongRepository):
         collection = self.__get_collection()
         collection.update_one({'id': song.id}, {'$set': asdict(song)})
 
+    def get_random(self, count: int) -> list[Song]:
+        collection = self.__get_collection()
+        pipeline = [{'$sample': {'size': count}}]
+        return [
+            Song(
+                id=doc['id'],
+                fid=doc['fid'],
+                title=doc['title'],
+                origin=doc['origin'],
+                length=doc['length']
+            )
+            for doc in collection.aggregate(pipeline)
+        ]
+
     def __get_collection(self):
         return self.__mongo_client.get_database('turbo-bot').get_collection('songs')

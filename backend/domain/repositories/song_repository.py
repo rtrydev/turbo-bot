@@ -16,3 +16,7 @@ class SongRepository(ABC):
     @abstractmethod
     def update(self, song: Song) -> None:
         pass
+
+    @abstractmethod
+    def get_random(self, count: int) -> list[Song]:
+        pass

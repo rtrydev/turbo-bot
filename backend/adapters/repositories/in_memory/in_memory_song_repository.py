@@ -1,3 +1,4 @@
+import random
 from typing import Optional
 
 from backend.domain.models.song import Song
@@ -28,3 +29,6 @@ class InMemorySongRepository(SongRepository):
             if existing_song.id == song.id:
                 self.__store[i] = song
                 return
+
+    def get_random(self, count: int) -> list[Song]:
+        return random.sample(self.__store, min(count, len(self.__store)))

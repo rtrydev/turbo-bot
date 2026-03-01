@@ -12,6 +12,7 @@ from backend.adapters.services.in_memory_context_manager_service import InMemory
 from backend.adapters.services.rabbitmq_download_queue_service import RabbitMQDownloadQueueService
 from backend.adapters.services.seaweedfs_filesystem_service import SeaweedfsFilesystemService
 from backend.adapters.services.youtube_media_download_service import YoutubeMediaDownloadService
+from backend.application.commands.add_random_songs_to_queue_command import AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler
 from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand, AddSongToQueueCommandHandler
 from backend.application.commands.create_song_command import CreateSongCommand, CreateSongCommandHandler
 from backend.application.commands.download_song_command import DownloadSongCommand, DownloadSongCommandHandler
@@ -81,4 +82,5 @@ def get_mediator(discord_connect=False) -> Mediator:
         .register(ResumeSongCommand, ResumeSongCommandHandler)\
         .register(SkipSongInQueueCommand, SkipSongInQueueCommandHandler)\
         .register(StartQueuePlaybackCommand, StartQueuePlaybackCommandHandler)\
-        .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)
+        .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)\
+        .register(AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler)

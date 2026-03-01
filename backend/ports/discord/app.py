@@ -2,6 +2,7 @@ import os
 
 import discord
 
+from backend.application.commands.add_random_songs_to_queue_command import AddRandomSongsToQueueCommand
 from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand
 from backend.application.commands.create_song_command import CreateSongCommand
 from backend.application.commands.join_channel_command import JoinChannelCommand
@@ -97,6 +98,16 @@ async def skip(interaction: discord.Interaction):
         await interaction.followup.send('Skipped to the next song in the queue.')
     except Exception as e:
         await interaction.followup.send(f'Error skipping song: {str(e)}')
+
+@tree_cls.command(name='random-playlist', description='Add random songs from the database to the queue.')
+async def random_playlist(interaction: discord.Interaction, count: int):
+    await interaction.response.defer(ephemeral=True)
+
+    try:
+        mediator.send(AddRandomSongsToQueueCommand(count=count))
+        await interaction.followup.send(f'Added {count} random songs to the queue.')
+    except Exception as e:
+        await interaction.followup.send(f'Error adding random songs: {str(e)}')
 
 @tree_cls.command(name='repeat', description='Toggle repeat mode for the current song.')
 async def repeat(interaction: discord.Interaction):
