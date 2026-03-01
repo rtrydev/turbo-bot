@@ -24,6 +24,7 @@ from backend.application.commands.skip_song_in_queue_command import SkipSongInQu
     SkipSongInQueueCommandHandler
 from backend.application.commands.start_queue_playback_command import StartQueuePlaybackCommand, \
     StartQueuePlaybackCommandHandler
+from backend.application.commands.clear_queue_command import ClearQueueCommand, ClearQueueCommandHandler
 from backend.application.commands.toggle_repeat_command import ToggleRepeatCommand, ToggleRepeatCommandHandler
 from backend.application.providers.saved_audio_provider import SavedAudioProvider
 from backend.application.providers.stream_audio_provider import StreamAudioProvider
@@ -83,4 +84,5 @@ def get_mediator(discord_connect=False) -> Mediator:
         .register(SkipSongInQueueCommand, SkipSongInQueueCommandHandler)\
         .register(StartQueuePlaybackCommand, StartQueuePlaybackCommandHandler)\
         .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)\
-        .register(AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler)
+        .register(AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler)\
+        .register(ClearQueueCommand, ClearQueueCommandHandler)

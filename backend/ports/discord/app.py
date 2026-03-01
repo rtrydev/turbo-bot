@@ -3,6 +3,7 @@ import os
 import discord
 
 from backend.application.commands.add_random_songs_to_queue_command import AddRandomSongsToQueueCommand
+from backend.application.commands.clear_queue_command import ClearQueueCommand
 from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand
 from backend.application.commands.create_song_command import CreateSongCommand
 from backend.application.commands.join_channel_command import JoinChannelCommand
@@ -111,6 +112,14 @@ async def random_playlist(interaction: discord.Interaction, count: int):
         await interaction.followup.send(f'Added {count} random songs to the queue.')
     except Exception as e:
         await interaction.followup.send(f'Error adding random songs: {str(e)}')
+
+@tree_cls.command(name='clear', description='Remove all songs from the queue.')
+async def clear(interaction: discord.Interaction):
+    try:
+        mediator.send(ClearQueueCommand())
+        await interaction.response.send_message('Queue cleared.')
+    except Exception as e:
+        await interaction.response.send_message(f'Error clearing queue: {str(e)}')
 
 @tree_cls.command(name='repeat', description='Toggle repeat mode for the current song.')
 async def repeat(interaction: discord.Interaction):
