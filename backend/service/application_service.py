@@ -57,7 +57,7 @@ def get_mediator(discord_connect=False) -> Mediator:
 
         container.register(discord.Client, lambda: discord_client, scope=Scope.singleton)
         container.register(ChannelConnectionProvider, DiscordChannelConnectionProvider, scope=Scope.singleton)
-        container.register(MediaPlayerService, DiscordMediaPlayerService)
+        container.register(MediaPlayerService, DiscordMediaPlayerService, scope=Scope.singleton)
 
     container.register(MongoClient, lambda: MongoClient(mongo_uri), scope=Scope.singleton)
 
