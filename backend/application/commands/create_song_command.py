@@ -36,7 +36,7 @@ class CreateSongCommandHandler(RequestHandler[CreateSongCommand, SongCreateRespo
         song = Song(
             id=song_id,
             fid=None,
-            origin=request.origin,
+            origin=f"https://www.youtube.com/watch?v={song_id}",
             length=song_meta.length,
             title=song_meta.title
         )

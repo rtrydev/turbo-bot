@@ -33,11 +33,9 @@ class YoutubeMediaDownloadService(MediaDownloadService):
                     'preferredcodec': 'opus',
                     'preferredquality': '192'
                 }],
-                'postprocessor_args': [
-                    '-ar', '48000',
-                    '-ac', '2',
-                    '-f', 'opus'
-                ]
+                'postprocessor_args': {
+                    'FFmpegExtractAudio': ['-ar', '48000', '-ac', '2']
+                }
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
