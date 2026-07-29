@@ -3,6 +3,8 @@ from dataclasses import dataclass
 
 from backend.application.utils.mediator import Request, RequestHandler
 from backend.domain.providers.channel_connection_provider import ChannelConnectionProvider
+from backend.domain.services.context_manager_service import ContextManagerService
+from backend.domain.services.media_player_service import MediaPlayerService
 
 
 @dataclass
@@ -11,11 +13,23 @@ class LeaveChannelCommand(Request[None]):
 
 class LeaveChannelCommandHandler(RequestHandler[LeaveChannelCommand, None]):
     __channel_connection_provider: ChannelConnectionProvider
+    __context_manager_service: ContextManagerService
+    __media_player_service: MediaPlayerService
 
-    def __init__(self, channel_connection_provider: ChannelConnectionProvider) -> None:
+    def __init__(self, channel_connection_provider: ChannelConnectionProvider, context_manager_service: ContextManagerService, media_player_service: MediaPlayerService) -> None:
         self.__channel_connection_provider = channel_connection_provider
+        self.__context_manager_service = context_manager_service
+        self.__media_player_service = media_player_service
 
     def handle(self, request: LeaveChannelCommand) -> None:
+        queue_state = self.__context_manager_service.get_queue_state()
+        queue_state.clear()
+        queue_state.skip()
+
+        channel = self.__channel_connection_provider.get_channel_connection()
+        if channel is not None and (channel.is_playing() or channel.is_paused()):
+            self.__media_player_service.stop()
+
         asyncio.create_task(
             self.__channel_connection_provider.disconnect_from_channel()
         )
