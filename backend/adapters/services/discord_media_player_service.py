@@ -100,7 +100,10 @@ class DiscordMediaPlayerService(MediaPlayerService):
             if self._current_playback_id == my_playback_id:
                 self.next()
 
-        source = WatchdogFFmpegOpusAudio(temp_file_name)
+        source = WatchdogFFmpegOpusAudio(
+            temp_file_name,
+            options='-af loudnorm=I=-14:TP=-1.5:LRA=11'
+        )
         channel.play(source, after=after_callback)
 
         def watchdog():
