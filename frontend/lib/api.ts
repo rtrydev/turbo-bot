@@ -1,9 +1,7 @@
 import type { ConnectionStatusDTO, QueueStateDTO, SongsListResponseDTO } from '@/lib/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${endpoint}`, {
+  const res = await fetch(endpoint, {
     headers: {
       'Content-Type': 'application/json',
     },
