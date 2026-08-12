@@ -47,3 +47,22 @@ class SongQueue:
 
     def skip(self) -> None:
         self.__last_song = None
+
+    def get_last_song(self) -> Optional[Song]:
+        return self.__last_song
+
+    def is_repeat_enabled(self) -> bool:
+        return self.__repeat
+
+    def remove_at(self, index: int) -> Optional[Song]:
+        if 0 <= index < len(self.__songs):
+            return self.__songs.pop(index)
+        return None
+
+    def move(self, from_index: int, to_index: int) -> None:
+        if 0 <= from_index < len(self.__songs) and 0 <= to_index < len(self.__songs):
+            song = self.__songs.pop(from_index)
+            self.__songs.insert(to_index, song)
+
+    def __len__(self) -> int:
+        return len(self.__songs)

@@ -29,6 +29,9 @@ from backend.application.commands.toggle_repeat_command import ToggleRepeatComma
 from backend.application.providers.saved_audio_provider import SavedAudioProvider
 from backend.application.providers.stream_audio_provider import StreamAudioProvider
 from backend.application.queries.get_song_by_id_query import GetSongByIdQuery, GetSongByIdQueryHandler
+from backend.application.queries.get_queue_state_query import GetQueueStateQuery, GetQueueStateQueryHandler
+from backend.application.queries.list_songs_query import ListSongsQuery, ListSongsQueryHandler
+from backend.application.queries.get_connection_status_query import GetConnectionStatusQuery, GetConnectionStatusQueryHandler
 from backend.application.utils.mediator import Mediator
 from backend.domain.providers.channel_connection_provider import ChannelConnectionProvider
 from backend.domain.repositories.song_repository import SongRepository
@@ -72,17 +75,25 @@ def get_mediator(discord_connect=False) -> Mediator:
     container.register(StreamAudioProvider)
     container.register(YoutubeSongMetadataProvider)
 
-    return Mediator()\
+    mediator = Mediator()\
         .register(CreateSongCommand, CreateSongCommandHandler)\
         .register(GetSongByIdQuery, GetSongByIdQueryHandler)\
         .register(DownloadSongCommand, DownloadSongCommandHandler)\
-        .register(AddSongToQueueCommand, AddSongToQueueCommandHandler)\
-        .register(JoinChannelCommand, JoinChannelCommandHandler)\
-        .register(LeaveChannelCommand, LeaveChannelCommandHandler)\
-        .register(PauseSongCommand, PauseSongCommandHandler)\
-        .register(ResumeSongCommand, ResumeSongCommandHandler)\
-        .register(SkipSongInQueueCommand, SkipSongInQueueCommandHandler)\
-        .register(StartQueuePlaybackCommand, StartQueuePlaybackCommandHandler)\
-        .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)\
-        .register(AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler)\
-        .register(ClearQueueCommand, ClearQueueCommandHandler)
+        .register(AddSongToQueueCommand, AddSongToQueueCommandHandler)
+
+    if discord_connect:
+        mediator = mediator\
+            .register(JoinChannelCommand, JoinChannelCommandHandler)\
+            .register(LeaveChannelCommand, LeaveChannelCommandHandler)\
+            .register(PauseSongCommand, PauseSongCommandHandler)\
+            .register(ResumeSongCommand, ResumeSongCommandHandler)\
+            .register(SkipSongInQueueCommand, SkipSongInQueueCommandHandler)\
+            .register(StartQueuePlaybackCommand, StartQueuePlaybackCommandHandler)\
+            .register(ToggleRepeatCommand, ToggleRepeatCommandHandler)\
+            .register(AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler)\
+            .register(ClearQueueCommand, ClearQueueCommandHandler)\
+            .register(GetQueueStateQuery, GetQueueStateQueryHandler)\
+            .register(ListSongsQuery, ListSongsQueryHandler)\
+            .register(GetConnectionStatusQuery, GetConnectionStatusQueryHandler)
+
+    return mediator

@@ -61,11 +61,14 @@ class DiscordMediaPlayerService(MediaPlayerService):
         self.__song_repository = song_repository
         self._next_lock = threading.Lock()
         self._current_playback_id = 0
+        self._current_song: Optional[Song] = None
 
     def play(self, song: Song) -> None:
         if song.fid is None:
             db_song = self.__song_repository.get_by_id(song.id)
             song.fid = db_song.fid
+
+        self._current_song = song
 
         audio_provider = AudioProviderFactory.create_audio_provider(song)
         audio_stream = audio_provider.get_audio(song)
@@ -167,3 +170,14 @@ class DiscordMediaPlayerService(MediaPlayerService):
                 self.play(next_song)
         finally:
             self._next_lock.release()
+
+    def is_playing(self) -> bool:
+        channel = self.__channel_connection_provider.get_channel_connection()
+        return channel is not None and channel.is_playing()
+
+    def is_paused(self) -> bool:
+        channel = self.__channel_connection_provider.get_channel_connection()
+        return channel is not None and channel.is_paused()
+
+    def get_current_song(self) -> Optional[Song]:
+        return self._current_song

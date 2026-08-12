@@ -8,4 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend backend
 
+EXPOSE 8080
+
 ENTRYPOINT ["python", "-m", "backend.ports.discord.app"]
