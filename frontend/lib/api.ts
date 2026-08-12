@@ -1,7 +1,22 @@
 import type { ConnectionStatusDTO, QueueStateDTO, SongsListResponseDTO } from '@/lib/types';
 
+let apiBase = '';
+
+async function resolveApiBase(): Promise<string> {
+  if (apiBase) return apiBase;
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    apiBase = data.apiUrl || 'http://localhost:8080';
+  } catch {
+    apiBase = 'http://localhost:8080';
+  }
+  return apiBase;
+}
+
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(endpoint, {
+  const base = await resolveApiBase();
+  const res = await fetch(`${base}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
     },

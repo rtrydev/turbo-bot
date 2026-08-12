@@ -94,13 +94,13 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
-      args:
-        BACKEND_URL: http://backend:8080
     container_name: admin-frontend
     restart: unless-stopped
     image: turbo-bot-admin
     ports:
       - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8080
 
 volumes:
   mongo_data:
