@@ -164,7 +164,7 @@ function ControlButton({ onClick, label, icon, active, danger }: { onClick: () =
     pause: 'M6 4h4v16H6V4zm8 0h4v16h-4V4z',
     resume: 'M8 5v14l11-7z',
     skip: 'M5 4l10 8-10 8V4zM16 4h2v16h-2V4z',
-    repeat: 'M4 4v5h5M20 20v-5h-5',
+    repeat: 'M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z',
     clear: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
   };
 
