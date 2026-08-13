@@ -41,6 +41,8 @@ async def cors_middleware(app: web.Application, handler):
 
 def create_app(mediator: Mediator) -> web.Application:
     app = web.Application(middlewares=[cors_middleware])
+    app['mediator'] = mediator
+
     app.router.add_get('/api/status', get_status)
     app.router.add_get('/api/queue', get_queue)
     app.router.add_post('/api/queue/add', add_song_to_queue)
@@ -58,7 +60,7 @@ def create_app(mediator: Mediator) -> web.Application:
 
 async def get_status(request: web.Request) -> web.Response:
     try:
-        status = mediator.send(GetConnectionStatusQuery())
+        status = request.app['mediator'].send(GetConnectionStatusQuery())
         return web.json_response(serialize(status))
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -66,7 +68,7 @@ async def get_status(request: web.Request) -> web.Response:
 
 async def get_queue(request: web.Request) -> web.Response:
     try:
-        queue_state = mediator.send(GetQueueStateQuery())
+        queue_state = request.app['mediator'].send(GetQueueStateQuery())
         return web.json_response(serialize(queue_state))
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -80,6 +82,7 @@ async def add_song_to_queue(request: web.Request) -> web.Response:
         if not origin:
             return web.json_response({'error': 'origin is required'}, status=400)
 
+        mediator = request.app['mediator']
         mediator.send(CreateSongCommand(origin=origin))
         mediator.send(AddSongToQueueCommand(origin=origin))
 
@@ -95,7 +98,7 @@ async def add_random_songs(request: web.Request) -> web.Response:
         body = await request.json()
         count = body.get('count', 10)
 
-        mediator.send(AddRandomSongsToQueueCommand(count=count))
+        request.app['mediator'].send(AddRandomSongsToQueueCommand(count=count))
 
         return web.json_response({'message': f'Added {count} random songs to the queue'})
     except Exception as e:
@@ -104,7 +107,7 @@ async def add_random_songs(request: web.Request) -> web.Response:
 
 async def clear_queue(request: web.Request) -> web.Response:
     try:
-        mediator.send(ClearQueueCommand())
+        request.app['mediator'].send(ClearQueueCommand())
         return web.json_response({'message': 'Queue cleared'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -112,7 +115,7 @@ async def clear_queue(request: web.Request) -> web.Response:
 
 async def start_playback(request: web.Request) -> web.Response:
     try:
-        mediator.send(StartQueuePlaybackCommand())
+        request.app['mediator'].send(StartQueuePlaybackCommand())
         return web.json_response({'message': 'Playback started'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -120,7 +123,7 @@ async def start_playback(request: web.Request) -> web.Response:
 
 async def pause_playback(request: web.Request) -> web.Response:
     try:
-        mediator.send(PauseSongCommand())
+        request.app['mediator'].send(PauseSongCommand())
         return web.json_response({'message': 'Playback paused'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -128,7 +131,7 @@ async def pause_playback(request: web.Request) -> web.Response:
 
 async def resume_playback(request: web.Request) -> web.Response:
     try:
-        mediator.send(ResumeSongCommand())
+        request.app['mediator'].send(ResumeSongCommand())
         return web.json_response({'message': 'Playback resumed'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -136,7 +139,7 @@ async def resume_playback(request: web.Request) -> web.Response:
 
 async def skip_song(request: web.Request) -> web.Response:
     try:
-        mediator.send(SkipSongInQueueCommand())
+        request.app['mediator'].send(SkipSongInQueueCommand())
         return web.json_response({'message': 'Skipped to next song'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -144,7 +147,7 @@ async def skip_song(request: web.Request) -> web.Response:
 
 async def toggle_repeat(request: web.Request) -> web.Response:
     try:
-        mediator.send(ToggleRepeatCommand())
+        request.app['mediator'].send(ToggleRepeatCommand())
         return web.json_response({'message': 'Toggled repeat mode'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -156,11 +159,13 @@ async def list_songs(request: web.Request) -> web.Response:
         page = int(request.query.get('page', '0'))
         limit = int(request.query.get('limit', '25'))
 
-        result = mediator.send(ListSongsQuery(query=query, page=page, limit=limit))
+        result = request.app['mediator'].send(ListSongsQuery(query=query, page=page, limit=limit))
         return web.json_response(serialize(result))
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
 
 if __name__ == '__main__':
-    web.run_app(create_app(), host='0.0.0.0', port=8080)
+    from backend.service.application_service import get_mediator
+    mediator = get_mediator(discord_connect=True)
+    web.run_app(create_app(mediator), host='0.0.0.0', port=8080)
