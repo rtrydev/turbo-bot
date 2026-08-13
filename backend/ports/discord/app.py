@@ -1,5 +1,7 @@
+import asyncio
 import os
 
+from aiohttp import web
 import discord
 
 from backend.application.commands.add_random_songs_to_queue_command import AddRandomSongsToQueueCommand
@@ -13,6 +15,7 @@ from backend.application.commands.resume_song_command import ResumeSongCommand
 from backend.application.commands.skip_song_in_queue_command import SkipSongInQueueCommand
 from backend.application.commands.start_queue_playback_command import StartQueuePlaybackCommand
 from backend.application.commands.toggle_repeat_command import ToggleRepeatCommand
+from backend.ports.api.app import create_app as create_api_app
 from backend.service.application_service import get_mediator
 from backend.service.dependency_injection import container
 
@@ -129,5 +132,18 @@ async def repeat(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f'Error toggling repeat mode: {str(e)}')
 
+async def main() -> None:
+    api_app = create_api_app(mediator)
+    runner = web.AppRunner(api_app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+    print('Admin API server started on port 8080')
+
+    discord_token = os.environ.get('DISCORD_TOKEN')
+    await client.login(discord_token)
+    await client.connect()
+
+
 if __name__ == '__main__':
-    client.run(token=os.environ.get('DISCORD_TOKEN'))
+    asyncio.run(main())

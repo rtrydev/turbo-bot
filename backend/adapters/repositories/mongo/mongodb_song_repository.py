@@ -53,5 +53,28 @@ class MongoDBSongRepository(SongRepository):
             for doc in collection.aggregate(pipeline)
         ]
 
+    def find(self, query: str = '', page: int = 0, limit: int = 25) -> tuple[list[Song], int]:
+        collection = self.__get_collection()
+        filter_query = {}
+        if query:
+            filter_query['title'] = {'$regex': query, '$options': 'i'}
+
+        total = collection.count_documents(filter_query)
+        songs = list(collection.find(filter_query).skip(page * limit).limit(limit).sort('title', 1))
+
+        return (
+            [
+                Song(
+                    id=doc['id'],
+                    fid=doc['fid'],
+                    title=doc['title'],
+                    origin=doc['origin'],
+                    length=doc['length']
+                )
+                for doc in songs
+            ],
+            total
+        )
+
     def __get_collection(self):
         return self.__mongo_client.get_database('turbo-bot').get_collection('songs')

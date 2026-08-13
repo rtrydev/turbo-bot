@@ -20,3 +20,7 @@ class SongRepository(ABC):
     @abstractmethod
     def get_random(self, count: int) -> list[Song]:
         pass
+
+    @abstractmethod
+    def find(self, query: str = '', page: int = 0, limit: int = 25) -> tuple[list[Song], int]:
+        pass

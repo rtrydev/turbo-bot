@@ -6,6 +6,8 @@ services:
     container_name: backend
     restart: unless-stopped
     image: turbo-bot-backend
+    ports:
+      - "8080:8080"
     depends_on:
       - mongo
       - seaweed-master
@@ -63,7 +65,7 @@ services:
     restart: unless-stopped
     command: "volume -ip=seaweed-volume -mserver=seaweed-master:9333 -port=8080"
     ports:
-      - "8080:8080"
+      - "8081:8080"
     volumes:
       - seaweed_volume_data:/data
 
@@ -87,6 +89,18 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+
+  admin-frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    container_name: admin-frontend
+    restart: unless-stopped
+    image: turbo-bot-admin
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: http://backend:8080
 
 volumes:
   mongo_data:
