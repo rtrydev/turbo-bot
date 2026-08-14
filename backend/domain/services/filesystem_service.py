@@ -10,3 +10,7 @@ class FilesystemService(ABC):
     @abstractmethod
     def get_file(self, descriptor: str) -> Optional[bytes]:
         pass
+
+    @abstractmethod
+    def delete_file(self, descriptor: str) -> None:
+        pass

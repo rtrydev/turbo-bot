@@ -18,6 +18,7 @@ export default function SongsPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const { showToast } = useToast();
 
   const limit = 25;
@@ -52,6 +53,20 @@ export default function SongsPage() {
       showToast(err instanceof Error ? err.message : 'Failed to add song', 'error');
     } finally {
       setAddingId(null);
+    }
+  };
+
+  const handleDeleteSong = async (song: SongDTO) => {
+    if (!window.confirm(`Remove "${song.title}" from the library?`)) return;
+    setRemovingId(song.id);
+    try {
+      await api.deleteSong(song.id);
+      showToast(`"${song.title}" removed`, 'success');
+      await fetchData();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to remove song', 'error');
+    } finally {
+      setRemovingId(null);
     }
   };
 
@@ -102,7 +117,14 @@ export default function SongsPage() {
         {(data?.songs.length ?? 0) > 0 ? (
           <div className="divide-y divide-slate-700">
             {data!.songs.map((song) => (
-              <SongRow key={song.id} song={song} onAdd={handleAddToQueue} isAdding={addingId === song.id} />
+              <SongRow
+                key={song.id}
+                song={song}
+                onAdd={handleAddToQueue}
+                isAdding={addingId === song.id}
+                onDelete={handleDeleteSong}
+                isRemoving={removingId === song.id}
+              />
             ))}
           </div>
         ) : (
@@ -136,7 +158,19 @@ export default function SongsPage() {
   );
 }
 
-function SongRow({ song, onAdd, isAdding }: { song: SongDTO; onAdd: (song: SongDTO) => void; isAdding: boolean }) {
+function SongRow({
+  song,
+  onAdd,
+  isAdding,
+  onDelete,
+  isRemoving
+}: {
+  song: SongDTO;
+  onAdd: (song: SongDTO) => void;
+  isAdding: boolean;
+  onDelete: (song: SongDTO) => void;
+  isRemoving: boolean;
+}) {
   return (
     <div className="flex items-center gap-4 p-4 hover:bg-slate-700/50 transition-colors">
       <svg className="w-10 h-10 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -153,6 +187,13 @@ function SongRow({ song, onAdd, isAdding }: { song: SongDTO; onAdd: (song: SongD
         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
       >
         {isAdding ? '...' : 'Queue'}
+      </button>
+      <button
+        onClick={() => onDelete(song)}
+        disabled={isRemoving}
+        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
+      >
+        {isRemoving ? '...' : 'Remove'}
       </button>
     </div>
   );
