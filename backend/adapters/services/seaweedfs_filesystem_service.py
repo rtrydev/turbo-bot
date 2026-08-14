@@ -13,3 +13,6 @@ class SeaweedfsFilesystemService(FilesystemService):
 
     def get_file(self, descriptor: str) -> Optional[bytes]:
         return self.client.get_file(descriptor)
+
+    def delete_file(self, descriptor: str) -> None:
+        return self.client.delete_file(descriptor)

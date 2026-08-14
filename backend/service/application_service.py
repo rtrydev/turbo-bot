@@ -15,6 +15,7 @@ from backend.adapters.services.youtube_media_download_service import YoutubeMedi
 from backend.application.commands.add_random_songs_to_queue_command import AddRandomSongsToQueueCommand, AddRandomSongsToQueueCommandHandler
 from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand, AddSongToQueueCommandHandler
 from backend.application.commands.create_song_command import CreateSongCommand, CreateSongCommandHandler
+from backend.application.commands.delete_song_command import DeleteSongCommand, DeleteSongCommandHandler
 from backend.application.commands.download_song_command import DownloadSongCommand, DownloadSongCommandHandler
 from backend.application.commands.join_channel_command import JoinChannelCommand, JoinChannelCommandHandler
 from backend.application.commands.leave_channel_command import LeaveChannelCommand, LeaveChannelCommandHandler
@@ -77,6 +78,7 @@ def get_mediator(discord_connect=False) -> Mediator:
 
     mediator = Mediator()\
         .register(CreateSongCommand, CreateSongCommandHandler)\
+        .register(DeleteSongCommand, DeleteSongCommandHandler)\
         .register(GetSongByIdQuery, GetSongByIdQueryHandler)\
         .register(DownloadSongCommand, DownloadSongCommandHandler)\
         .register(AddSongToQueueCommand, AddSongToQueueCommandHandler)

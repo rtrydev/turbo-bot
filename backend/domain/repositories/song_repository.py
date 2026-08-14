@@ -18,6 +18,10 @@ class SongRepository(ABC):
         pass
 
     @abstractmethod
+    def delete(self, _id: str) -> bool:
+        pass
+
+    @abstractmethod
     def get_random(self, count: int) -> list[Song]:
         pass
 

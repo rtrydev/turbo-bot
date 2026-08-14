@@ -36,6 +36,8 @@ export const api = {
   getQueue: () => fetchAPI<QueueStateDTO>('/api/queue'),
   listSongs: (query?: string, page = 0, limit = 25) =>
     fetchAPI<SongsListResponseDTO>(`/api/songs?q=${encodeURIComponent(query || '')}&page=${page}&limit=${limit}`),
+  deleteSong: (id: string) =>
+    fetchAPI<Record<string, unknown>>(`/api/songs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   addSong: (origin: string) =>
     fetchAPI<Record<string, unknown>>('/api/queue/add', { method: 'POST', body: JSON.stringify({ origin }) }),

@@ -39,6 +39,10 @@ class MongoDBSongRepository(SongRepository):
         collection = self.__get_collection()
         collection.update_one({'id': song.id}, {'$set': asdict(song)})
 
+    def delete(self, _id: str) -> bool:
+        collection = self.__get_collection()
+        return collection.delete_one({'id': _id}).deleted_count > 0
+
     def get_random(self, count: int) -> list[Song]:
         collection = self.__get_collection()
         pipeline = [{'$sample': {'size': count}}]

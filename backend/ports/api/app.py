@@ -7,6 +7,7 @@ from backend.application.commands.add_random_songs_to_queue_command import AddRa
 from backend.application.commands.add_song_to_queue_command import AddSongToQueueCommand
 from backend.application.commands.clear_queue_command import ClearQueueCommand
 from backend.application.commands.create_song_command import CreateSongCommand
+from backend.application.commands.delete_song_command import DeleteSongCommand
 from backend.application.commands.pause_song_command import PauseSongCommand
 from backend.application.commands.resume_song_command import ResumeSongCommand
 from backend.application.commands.skip_song_in_queue_command import SkipSongInQueueCommand
@@ -54,6 +55,7 @@ def create_app(mediator: Mediator) -> web.Application:
     app.router.add_post('/api/queue/skip', skip_song)
     app.router.add_post('/api/queue/repeat', toggle_repeat)
     app.router.add_get('/api/songs', list_songs)
+    app.router.add_delete('/api/songs/{id}', delete_song)
 
     return app
 
@@ -161,6 +163,19 @@ async def list_songs(request: web.Request) -> web.Response:
 
         result = request.app['mediator'].send(ListSongsQuery(query=query, page=page, limit=limit))
         return web.json_response(serialize(result))
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
+
+async def delete_song(request: web.Request) -> web.Response:
+    try:
+        song_id = request.match_info['id']
+
+        request.app['mediator'].send(DeleteSongCommand(id=song_id))
+
+        return web.json_response({'message': 'Song deleted successfully'})
+    except ValueError as e:
+        return web.json_response({'error': str(e)}, status=404)
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 

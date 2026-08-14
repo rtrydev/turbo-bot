@@ -59,6 +59,9 @@ class SongQueue:
             return self.__songs.pop(index)
         return None
 
+    def remove(self, song: Song) -> None:
+        self.__songs = [s for s in self.__songs if s.id != song.id]
+
     def move(self, from_index: int, to_index: int) -> None:
         if 0 <= from_index < len(self.__songs) and 0 <= to_index < len(self.__songs):
             song = self.__songs.pop(from_index)
