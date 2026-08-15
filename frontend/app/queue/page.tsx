@@ -4,22 +4,15 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/lib/toast';
 import type { QueueStateDTO, SongDTO } from '@/lib/types';
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-async function safeAction(fn: () => Promise<unknown>, successMsg: string) {
-  try {
-    await fn();
-    return true;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
-}
+import { formatDuration } from '@/lib/format';
+import { PageHeader } from '@/components/PageHeader';
+import { NowPlaying } from '@/components/NowPlaying';
+import { TransportBar } from '@/components/TransportBar';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function QueuePage() {
   const [queue, setQueue] = useState<QueueStateDTO | null>(null);
@@ -27,23 +20,27 @@ export default function QueuePage() {
   const [randomCount, setRandomCount] = useState(10);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [randomBusy, setRandomBusy] = useState(false);
   const { showToast } = useToast();
 
-  const fetchData = async () => {
-    try {
-      const q = await api.getQueue();
-      setQueue(q);
-    } catch {
-      // Silently handle errors for polling
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const q = await api.getQueue();
+        if (!cancelled) setQueue(q);
+      } catch {
+        // Silently handle polling errors
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    const id = setInterval(load, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
   const handleAddSong = async (e: React.FormEvent) => {
@@ -62,167 +59,134 @@ export default function QueuePage() {
   };
 
   const handleAddRandom = async () => {
+    setRandomBusy(true);
     try {
       await api.addRandomSongs(randomCount);
       showToast(`Added ${randomCount} random songs`, 'success');
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to add random songs', 'error');
+    } finally {
+      setRandomBusy(false);
     }
   };
 
-  const handleAction = async (fn: () => Promise<unknown>, successMsg: string) => {
-    const ok = await safeAction(fn, successMsg);
-    showToast(ok ? successMsg : 'Action failed', ok ? 'success' : 'error');
-  };
+  if (loading) return <QueueSkeleton />;
 
-  if (loading) return <div className="text-slate-400">Loading...</div>;
+  const songCount = queue?.songs.length ?? 0;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold text-white">Queue Management</h2>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        title="Queue"
+        subtitle="Add tracks and control playback"
+        action={
+          <span className="rounded-full bg-white/[0.06] px-3 py-1 text-xs font-medium text-zinc-300 ring-1 ring-white/[0.08]">
+            {songCount} {songCount === 1 ? 'track' : 'tracks'} in queue
+          </span>
+        }
+      />
 
-      {/* Add Song Form */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <p className="text-sm text-slate-400 mb-4">Add a Song</p>
-        <form onSubmit={handleAddSong} className="flex gap-3">
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste YouTube URL..."
-            className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-          />
-          <button
-            type="submit"
-            disabled={adding || !url.trim()}
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-          >
-            {adding ? 'Adding...' : 'Add'}
-          </button>
+      <Card className="animate-fade-up p-5">
+        <form onSubmit={handleAddSong} className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Icon name="link" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="Paste a YouTube URL…"
+              className="h-11 w-full rounded-xl bg-white/[0.04] pl-10 pr-4 text-sm text-white ring-1 ring-white/[0.08] transition-all placeholder:text-zinc-600 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+            />
+          </div>
+          <Button type="submit" variant="primary" size="lg" icon="plus" loading={adding} disabled={!url.trim()}>
+            Add to queue
+          </Button>
         </form>
 
-        <div className="flex gap-3 mt-4">
-          <input
-            type="number"
-            value={randomCount}
-            onChange={(e) => setRandomCount(parseInt(e.target.value) || 1)}
-            min={1}
-            max={50}
-            className="w-24 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500"
-          />
-          <button
-            onClick={handleAddRandom}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg font-medium transition-colors"
-          >
-            Add Random Songs
-          </button>
-        </div>
-      </div>
-
-      {/* Playback Controls */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <p className="text-sm text-slate-400 mb-4">Playback Controls</p>
-        <div className="flex gap-3 flex-wrap">
-          <QueueButton onClick={() => handleAction(api.startPlayback, 'Playback started')} label="Play" icon="M8 5v14l11-7z" />
-          <QueueButton
-            onClick={() => handleAction(
-              queue?.is_playing ? api.pausePlayback : api.resumePlayback,
-              queue?.is_playing ? 'Playback paused' : 'Playback resumed'
-            )}
-            label={queue?.is_playing ? 'Pause' : 'Resume'}
-            icon="M6 4h4v16H6V4zm8 0h4v16h-4V4z"
-          />
-          <QueueButton onClick={() => handleAction(api.skipSong, 'Skipped to next song')} label="Skip" icon="M5 4l10 8-10 8V4zM16 4h2v16h-2V4z" />
-          <QueueButton
-            onClick={() => handleAction(api.toggleRepeat, `Repeat ${queue?.repeat_enabled ? 'disabled' : 'enabled'}`)}
-            label={`Repeat: ${queue?.repeat_enabled ? 'ON' : 'OFF'}`}
-            icon="M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-            active={queue?.repeat_enabled}
-          />
-          <QueueButton onClick={() => handleAction(api.clearQueue, 'Queue cleared')} label="Clear Queue" icon="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" danger />
-        </div>
-      </div>
-
-      {/* Now Playing */}
-      {queue?.currently_playing && (
-        <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-          <p className="text-sm text-slate-400 mb-3">Now Playing</p>
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-              queue.is_playing ? 'bg-indigo-600' : queue.is_paused ? 'bg-yellow-600' : 'bg-slate-600'
-            }`}>
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                {queue.is_playing ? (
-                  <path d="M8 5v14l11-7z" />
-                ) : queue.is_paused ? (
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                ) : (
-                  <path d="M12 3C6.48 3 2 7.48 2 13s4.48 10 10 10 10-4.48 10-10S17.52 3 12 3zm-2 14.5v-9l6 4.5-6 4.5z" />
-                )}
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium truncate">{queue.currently_playing.title}</p>
-              <p className="text-sm text-slate-400">{formatDuration(queue.currently_playing.length)}</p>
-            </div>
+        <div className="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-4 sm:flex-row sm:items-center">
+          <p className="flex-1 text-sm text-zinc-400">
+            Nothing in mind? Add a batch of{' '}
+            <span className="font-medium text-zinc-200">random tracks</span> from your library.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={randomCount}
+              onChange={(e) => setRandomCount(Math.max(1, parseInt(e.target.value) || 1))}
+              className="h-9 w-20 rounded-lg bg-white/[0.04] text-center text-sm text-white ring-1 ring-white/[0.08] outline-none transition-all focus:ring-2 focus:ring-violet-500/60"
+            />
+            <Button variant="ghost" icon="shuffle" loading={randomBusy} onClick={handleAddRandom}>
+              Add random
+            </Button>
           </div>
+        </div>
+      </Card>
+
+      <div className="animate-fade-up" style={{ animationDelay: '70ms' }}>
+        <TransportBar queue={queue} />
+      </div>
+
+      {queue?.currently_playing && (
+        <div className="animate-fade-up" style={{ animationDelay: '140ms' }}>
+          <NowPlaying queue={queue} />
         </div>
       )}
 
-      {/* Queue List */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-400">Queue</p>
-          <span className="px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-full text-xs font-medium">
-            {queue?.songs.length || 0} songs
-          </span>
-        </div>
-        {(queue?.songs.length ?? 0) > 0 ? (
-          <div className="space-y-2 max-h-96 overflow-auto">
-            {queue!.songs.map((song, i) => (
-              <SongItem key={song.id} song={song} index={i + 1} />
-            ))}
+      <div className="animate-fade-up" style={{ animationDelay: '210ms' }}>
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between px-5 pb-3 pt-4">
+            <h3 className="text-sm font-semibold text-white">Up next</h3>
+            <span className="font-mono text-xs text-zinc-500">
+              {songCount} {songCount === 1 ? 'track' : 'tracks'}
+            </span>
           </div>
-        ) : (
-          <p className="text-slate-500 text-center py-8">Queue is empty. Add some songs!</p>
-        )}
+          {songCount > 0 ? (
+            <div className="max-h-[28rem] divide-y divide-white/[0.05] overflow-y-auto">
+              {queue!.songs.map((song, i) => (
+                <QueueRow key={song.id} song={song} index={i + 1} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              icon="list"
+              title="Queue is empty"
+              description="Add a YouTube link above to start the party."
+            />
+          )}
+        </Card>
       </div>
     </div>
   );
 }
 
-function QueueButton({ onClick, label, icon, active, danger }: { onClick: () => void; label: string; icon: string; active?: boolean; danger?: boolean }) {
+function QueueRow({ song, index }: { song: SongDTO; index: number }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-        danger
-          ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
-          : active
-            ? 'bg-indigo-600 text-white'
-            : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
-      }`}
-    >
-      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-        <path d={icon} />
-      </svg>
-      {label}
-    </button>
+    <div className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.03]">
+      <span className="w-6 text-right font-mono text-[11px] text-zinc-600">{index}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06]">
+        <Icon name="music" className="h-4 w-4 text-zinc-400" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm text-zinc-100">{song.title}</p>
+        <p className="truncate text-xs text-zinc-500">{song.origin}</p>
+      </div>
+      <span className="font-mono text-xs text-zinc-500">{formatDuration(song.length)}</span>
+    </div>
   );
 }
 
-function SongItem({ song, index }: { song: SongDTO; index: number }) {
+function QueueSkeleton() {
   return (
-    <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors">
-      <span className="text-sm text-slate-400 w-6 text-right">{index}</span>
-      <svg className="w-8 h-8 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-      </svg>
-      <div className="flex-1 min-w-0">
-        <p className="text-white text-sm truncate">{song.title}</p>
-        <p className="text-xs text-slate-400 truncate">{song.origin}</p>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-32" />
+        <Skeleton className="h-4 w-64" />
       </div>
-      <span className="text-xs text-slate-400 flex-shrink-0">{formatDuration(song.length)}</span>
+      <Skeleton className="h-40 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-96 w-full rounded-2xl" />
     </div>
   );
 }

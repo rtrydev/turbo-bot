@@ -1,44 +1,114 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { api } from '@/lib/api';
+import type { ConnectionStatusDTO } from '@/lib/types';
+import { Icon, type IconName } from '@/components/ui/Icon';
 
-const navItems = [
-  { label: 'Dashboard', href: '/', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { label: 'Queue', href: '/queue', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-  { label: 'Songs', href: '/songs', icon: 'M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3' },
+const navItems: { label: string; href: string; icon: IconName }[] = [
+  { label: 'Dashboard', href: '/', icon: 'grid' },
+  { label: 'Queue', href: '/queue', icon: 'list' },
+  { label: 'Songs', href: '/songs', icon: 'library' },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [status, setStatus] = useState<ConnectionStatusDTO | null>(null);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        setStatus(await api.getStatus());
+      } catch {
+        // ignore polling errors
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const connected = status?.connected ?? false;
 
   return (
-    <aside className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col h-screen sticky top-0">
-      <div className="p-6 border-b border-slate-700">
-        <h1 className="text-xl font-bold text-white">Turbo Bot</h1>
-        <p className="text-sm text-slate-400 mt-1">Admin Panel</p>
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/70 backdrop-blur-2xl">
+      <div className="px-5 pb-5 pt-6">
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-fuchsia-500/25">
+            <Icon name="bolt" className="h-5 w-5 text-white" />
+            <span className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/25" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-[15px] font-semibold leading-tight tracking-tight text-white">
+              Turbo{' '}
+              <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+                Bot
+              </span>
+            </h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+              Admin console
+            </p>
+          </div>
+        </div>
       </div>
-      <nav className="flex-1 p-4 space-y-1">
+
+      <div className="mx-5 h-px bg-white/[0.06]" />
+
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-600">
+          Navigation
+        </p>
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  ? 'bg-white/[0.07] text-white ring-1 ring-white/[0.08]'
+                  : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100'
               }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-              </svg>
+              {isActive && (
+                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-gradient-to-b from-violet-400 to-fuchsia-500" />
+              )}
+              <Icon
+                name={item.icon}
+                className={`h-[18px] w-[18px] transition-colors ${
+                  isActive ? 'text-violet-300' : 'text-zinc-500 group-hover:text-zinc-300'
+                }`}
+              />
               {item.label}
             </Link>
           );
         })}
       </nav>
+
+      <div className="px-3 pb-4">
+        <div className="flex items-center gap-2.5 rounded-xl bg-white/[0.03] px-3.5 py-3 ring-1 ring-white/[0.06]">
+          <span className="relative flex h-2 w-2 shrink-0">
+            {connected && (
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+            )}
+            <span
+              className={`relative inline-flex h-2 w-2 rounded-full ${
+                connected ? 'bg-emerald-400' : 'bg-red-400'
+              }`}
+            />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-zinc-200">
+              {connected ? 'Bot online' : 'Bot offline'}
+            </p>
+            <p className="truncate text-[11px] text-zinc-500">
+              {connected ? (status?.channel_name || 'No channel') : 'Disconnected'}
+            </p>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }

@@ -1,188 +1,266 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
-import { useToast } from '@/lib/toast';
-import type { QueueStateDTO, ConnectionStatusDTO } from '@/lib/types';
-
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-async function safeAction(fn: () => Promise<unknown>, successMsg: string) {
-  try {
-    await fn();
-    return true;
-  } catch (err) {
-    console.error(err);
-    return false;
-  }
-}
+import type { ConnectionStatusDTO, QueueStateDTO } from '@/lib/types';
+import { formatDuration } from '@/lib/format';
+import { PageHeader } from '@/components/PageHeader';
+import { playbackState } from '@/components/NowPlaying';
+import { TransportBar } from '@/components/TransportBar';
+import { Card } from '@/components/ui/Card';
+import { Icon, type IconName } from '@/components/ui/Icon';
+import { Equalizer } from '@/components/ui/Equalizer';
+import { StatusPill } from '@/components/ui/StatusPill';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
 
 export default function Dashboard() {
   const [queue, setQueue] = useState<QueueStateDTO | null>(null);
   const [status, setStatus] = useState<ConnectionStatusDTO | null>(null);
   const [loading, setLoading] = useState(true);
-  const { showToast } = useToast();
-
-  const fetchData = async () => {
-    try {
-      const [q, s] = await Promise.all([api.getQueue(), api.getStatus()]);
-      setQueue(q);
-      setStatus(s);
-    } catch {
-      // Silently handle errors for polling
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [q, s] = await Promise.all([api.getQueue(), api.getStatus()]);
+        if (!cancelled) {
+          setQueue(q);
+          setStatus(s);
+        }
+      } catch {
+        // Silently handle polling errors
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    const id = setInterval(load, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, []);
 
-  if (loading) return <div className="text-slate-400">Loading...</div>;
+  if (loading) return <DashboardSkeleton />;
 
-  const handleAction = async (fn: () => Promise<unknown>, successMsg: string) => {
-    const ok = await safeAction(fn, successMsg);
-    showToast(ok ? successMsg : 'Action failed', ok ? 'success' : 'error');
-  };
+  const song = queue?.currently_playing ?? null;
+  const state = playbackState(queue);
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold text-white">Dashboard</h2>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Live overview of your bot"
+        action={<ConnectionChip status={status} />}
+      />
 
-      {/* Status Card */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-slate-400">Connection Status</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className={`w-3 h-3 rounded-full ${status?.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-lg font-semibold text-white">
-                {status?.connected ? `Connected to ${status.channel_name}` : 'Disconnected'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Now Playing Card */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <p className="text-sm text-slate-400 mb-3">Now Playing</p>
-        {queue?.currently_playing ? (
-          <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-              queue.is_playing ? 'bg-indigo-600' : queue.is_paused ? 'bg-yellow-600' : 'bg-slate-600'
-            }`}>
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                {queue.is_playing ? (
-                  <path d="M8 5v14l11-7z" />
-                ) : queue.is_paused ? (
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                ) : (
-                  <path d="M12 3C6.48 3 2 7.48 2 13s4.48 10 10 10 10-4.48 10-10S17.52 3 12 3zm-2 14.5v-9l6 4.5-6 4.5z" />
-                )}
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-medium truncate">{queue.currently_playing.title}</p>
-              <p className="text-sm text-slate-400">{formatDuration(queue.currently_playing.length)}</p>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-              queue.is_playing ? 'bg-green-500/20 text-green-400' :
-              queue.is_paused ? 'bg-yellow-500/20 text-yellow-400' :
-              'bg-slate-600/20 text-slate-400'
-            }`}>
-              {queue.is_playing ? 'Playing' : queue.is_paused ? 'Paused' : 'Stopped'}
-            </span>
-          </div>
-        ) : (
-          <p className="text-slate-500">No song playing</p>
-        )}
-      </div>
-
-      {/* Queue Overview */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-400">Queue</p>
-          <span className="px-3 py-1 bg-indigo-600/20 text-indigo-400 rounded-full text-xs font-medium">
-            {queue?.songs.length || 0} songs
-          </span>
-        </div>
-        {(queue?.songs.length ?? 0) > 0 ? (
-          <div className="space-y-2 max-h-64 overflow-auto">
-            {queue!.songs.map((song, i) => (
-              <div key={song.id} className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-                <span className="text-sm text-slate-400 w-6">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm truncate">{song.title}</p>
-                </div>
-                <span className="text-xs text-slate-400">{formatDuration(song.length)}</span>
+      {song ? (
+        <Card className="relative animate-fade-up overflow-hidden p-6" style={{ animationDelay: '60ms' }}>
+          <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-violet-600/[0.18] blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-fuchsia-600/[0.12] blur-3xl" />
+          <div className="relative flex flex-col items-center gap-5 sm:flex-row sm:gap-6">
+            <div className="relative shrink-0">
+              <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-2xl shadow-fuchsia-500/25">
+                <Icon name="music" className="h-10 w-10 text-white/90" />
               </div>
-            ))}
+              <span className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/20" />
+            </div>
+            <div className="min-w-0 flex-1 text-center sm:text-left">
+              <div className="flex items-center justify-center gap-3 sm:justify-start">
+                <span className={state === 'playing' ? 'text-violet-300' : 'text-zinc-600'}>
+                  <Equalizer active={state === 'playing'} />
+                </span>
+                <StatusPill state={state} />
+              </div>
+              <h3 className="mt-2.5 truncate text-xl font-semibold tracking-tight text-white">
+                {song.title}
+              </h3>
+              <p className="mt-1 truncate text-sm text-zinc-400">
+                {song.origin}
+                <span className="mx-1.5 text-zinc-600">·</span>
+                <span className="font-mono text-zinc-500">{formatDuration(song.length)}</span>
+              </p>
+            </div>
           </div>
-        ) : (
-          <p className="text-slate-500">Queue is empty</p>
-        )}
+        </Card>
+      ) : (
+        <Card className="animate-fade-up" style={{ animationDelay: '60ms' }}>
+          <EmptyState
+            icon="music"
+            title="Nothing is playing"
+            description="Add a song to the queue to get the music going."
+            action={
+              <Button href="/queue" variant="primary" icon="plus">
+                Open queue
+              </Button>
+            }
+          />
+        </Card>
+      )}
+
+      <div className="grid animate-fade-up gap-4 sm:grid-cols-3" style={{ animationDelay: '120ms' }}>
+        <StatCard
+          icon="wifi"
+          label="Connection"
+          value={
+            status?.connected
+              ? status.channel_name ?? 'Online'
+              : 'Disconnected'
+          }
+          tone={status?.connected ? 'good' : 'bad'}
+        />
+        <StatCard
+          icon="list"
+          label="Queue depth"
+          value={`${queue?.songs.length ?? 0} ${queue?.songs.length === 1 ? 'song' : 'songs'}`}
+        />
+        <StatCard
+          icon="repeat"
+          label="Repeat"
+          value={queue?.repeat_enabled ? 'Enabled' : 'Disabled'}
+          tone={queue?.repeat_enabled ? 'accent' : 'muted'}
+        />
       </div>
 
-      {/* Quick Controls */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <p className="text-sm text-slate-400 mb-4">Quick Controls</p>
-        <div className="flex gap-3 flex-wrap">
-          <ControlButton onClick={() => handleAction(api.startPlayback, 'Playback started')} label="Play" icon="play" />
-          <ControlButton
-            onClick={() => handleAction(
-              queue?.is_playing ? api.pausePlayback : api.resumePlayback,
-              queue?.is_playing ? 'Playback paused' : 'Playback resumed'
-            )}
-            label={queue?.is_playing ? 'Pause' : 'Resume'}
-            icon={queue?.is_playing ? 'pause' : 'resume'}
-          />
-          <ControlButton onClick={() => handleAction(api.skipSong, 'Skipped to next song')} label="Skip" icon="skip" />
-          <ControlButton
-            onClick={() => handleAction(api.toggleRepeat, `Repeat ${queue?.repeat_enabled ? 'disabled' : 'enabled'}`)}
-            label={`Repeat: ${queue?.repeat_enabled ? 'ON' : 'OFF'}`}
-            icon="repeat"
-            active={queue?.repeat_enabled}
-          />
-          <ControlButton onClick={() => handleAction(api.clearQueue, 'Queue cleared')} label="Clear Queue" icon="clear" danger />
-        </div>
+      <div className="animate-fade-up" style={{ animationDelay: '180ms' }}>
+        <TransportBar queue={queue} />
+      </div>
+
+      <div className="animate-fade-up" style={{ animationDelay: '240ms' }}>
+        <UpNextCard queue={queue} />
       </div>
     </div>
   );
 }
 
-function ControlButton({ onClick, label, icon, active, danger }: { onClick: () => void; label: string; icon: string; active?: boolean; danger?: boolean }) {
-  const icons: Record<string, string> = {
-    play: 'M8 5v14l11-7z',
-    pause: 'M6 4h4v16H6V4zm8 0h4v16h-4V4z',
-    resume: 'M8 5v14l11-7z',
-    skip: 'M5 4l10 8-10 8V4zM16 4h2v16h-2V4z',
-    repeat: 'M17.65 6.35A7.958 7.958 0 0012 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0112 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z',
-    clear: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
-  };
-
+function ConnectionChip({ status }: { status: ConnectionStatusDTO | null }) {
+  const connected = status?.connected ?? false;
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-        danger
-          ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30'
-          : active
-            ? 'bg-indigo-600 text-white'
-            : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:text-white'
+    <div
+      className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${
+        connected
+          ? 'bg-emerald-500/[0.08] text-emerald-300 ring-emerald-500/25'
+          : 'bg-red-500/[0.08] text-red-300 ring-red-500/25'
       }`}
     >
-      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-        <path d={icons[icon]} />
-      </svg>
-      {label}
-    </button>
+      <span className="relative flex h-1.5 w-1.5">
+        {connected && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+        )}
+        <span className={`relative h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
+      </span>
+      {connected ? (status?.channel_name ?? 'Online') : 'Offline'}
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  tone = 'muted',
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  tone?: 'good' | 'bad' | 'accent' | 'muted';
+}) {
+  const toneCls = {
+    good: 'text-emerald-300',
+    bad: 'text-red-300',
+    accent: 'text-violet-300',
+    muted: 'text-zinc-100',
+  }[tone];
+
+  return (
+    <Card className="flex items-center gap-3.5 p-4">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.05] ring-1 ring-white/[0.08]">
+        <Icon name={icon} className={`h-4 w-4 ${toneCls}`} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">{label}</p>
+        <p className={`mt-0.5 truncate text-sm font-medium ${toneCls}`}>{value}</p>
+      </div>
+    </Card>
+  );
+}
+
+function UpNextCard({ queue }: { queue: QueueStateDTO | null }) {
+  const songs = queue?.songs ?? [];
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex items-center justify-between px-5 pb-3 pt-4">
+        <div className="flex items-center gap-2.5">
+          <h3 className="text-sm font-semibold text-white">Up next</h3>
+          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-medium text-zinc-300 ring-1 ring-white/[0.06]">
+            {songs.length}
+          </span>
+        </div>
+        <Link
+          href="/queue"
+          className="group flex items-center gap-1 text-xs font-medium text-violet-300 transition-colors hover:text-violet-200"
+        >
+          Open queue
+          <Icon name="chevron-right" className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+
+      {songs.length > 0 ? (
+        <>
+          <div className="divide-y divide-white/[0.05]">
+            {songs.slice(0, 5).map((song, i) => (
+              <div key={song.id} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.03]">
+                <span className="w-5 text-right font-mono text-[11px] text-zinc-600">{i + 1}</span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06]">
+                  <Icon name="music" className="h-3.5 w-3.5 text-zinc-400" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-zinc-100">{song.title}</p>
+                  <p className="truncate text-xs text-zinc-500">{song.origin}</p>
+                </div>
+                <span className="font-mono text-xs text-zinc-500">{formatDuration(song.length)}</span>
+              </div>
+            ))}
+          </div>
+          {songs.length > 5 && (
+            <div className="border-t border-white/[0.06] px-5 py-2.5">
+              <p className="text-xs text-zinc-600">+ {songs.length - 5} more in queue</p>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="px-5 pb-5 pt-2">
+          <p className="text-sm text-zinc-500">
+            Queue is empty — add a song from the{' '}
+            <Link href="/queue" className="text-violet-300 transition-colors hover:text-violet-200">
+              queue page
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <Skeleton className="h-40 w-full rounded-2xl" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Skeleton className="h-[76px] rounded-2xl" />
+        <Skeleton className="h-[76px] rounded-2xl" />
+        <Skeleton className="h-[76px] rounded-2xl" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-2xl" />
+    </div>
   );
 }

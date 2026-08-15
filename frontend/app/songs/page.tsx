@@ -4,12 +4,16 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/lib/toast';
 import type { SongDTO, SongsListResponseDTO } from '@/lib/types';
+import { formatDuration } from '@/lib/format';
+import { PageHeader } from '@/components/PageHeader';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/ui/Icon';
+import { Modal } from '@/components/ui/Modal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Skeleton } from '@/components/ui/Skeleton';
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
+const LIMIT = 25;
 
 export default function SongsPage() {
   const [data, setData] = useState<SongsListResponseDTO | null>(null);
@@ -18,33 +22,37 @@ export default function SongsPage() {
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
-  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<SongDTO | null>(null);
   const { showToast } = useToast();
 
-  const limit = 25;
-
-  const fetchData = async () => {
-    try {
-      const result = await api.listSongs(query, page, limit);
-      setData(result);
-    } catch {
-      // Silently handle errors
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const result = await api.listSongs(query, page, LIMIT);
+        if (!cancelled) setData(result);
+      } catch {
+        // Silently handle errors
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [query, page]);
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / LIMIT)) : 1;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(0);
-    setQuery(searchTerm);
+    setQuery(searchTerm.trim());
   };
 
-  const handleAddToQueue = async (song: SongDTO) => {
+  const handleAdd = async (song: SongDTO) => {
     setAddingId(song.id);
     try {
       await api.addSong(song.origin);
@@ -56,145 +64,194 @@ export default function SongsPage() {
     }
   };
 
-  const handleDeleteSong = async (song: SongDTO) => {
-    if (!window.confirm(`Remove "${song.title}" from the library?`)) return;
-    setRemovingId(song.id);
+  const confirmRemove = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
     try {
-      await api.deleteSong(song.id);
-      showToast(`"${song.title}" removed`, 'success');
-      await fetchData();
+      await api.deleteSong(confirmDelete.id);
+      showToast(`"${confirmDelete.title}" removed`, 'success');
+      setConfirmDelete(null);
+      const result = await api.listSongs(query, page, LIMIT);
+      setData(result);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to remove song', 'error');
     } finally {
-      setRemovingId(null);
+      setDeleting(false);
     }
   };
 
-  const totalPages = data ? Math.ceil(data.total / limit) : 0;
-
-  if (loading && !data) return <div className="text-slate-400">Loading...</div>;
+  if (loading && !data) return <SongsSkeleton />;
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold text-white">Song Library</h2>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <PageHeader
+        title="Song Library"
+        subtitle={data ? `${data.total} ${data.total === 1 ? 'track' : 'tracks'} available` : 'Your saved tracks'}
+      />
 
-      {/* Search */}
-      <div className="bg-slate-800 rounded-xl p-6 border border-slate-700">
-        <form onSubmit={handleSearch} className="flex gap-3">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search songs by title..."
-            className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-          />
-          <button
-            type="submit"
-            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Search
-          </button>
-        </form>
-      </div>
-
-      {/* Results Info */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">
-          {data?.total || 0} songs found
-        </p>
-        {query && (
-          <button
-            onClick={() => { setQuery(''); setSearchTerm(''); setPage(0); }}
-            className="text-sm text-indigo-400 hover:text-indigo-300"
-          >
-            Clear search
-          </button>
-        )}
-      </div>
-
-      {/* Songs List */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        {(data?.songs.length ?? 0) > 0 ? (
-          <div className="divide-y divide-slate-700">
-            {data!.songs.map((song) => (
-              <SongRow
-                key={song.id}
-                song={song}
-                onAdd={handleAddToQueue}
-                isAdding={addingId === song.id}
-                onDelete={handleDeleteSong}
-                isRemoving={removingId === song.id}
-              />
-            ))}
+      <Card className="animate-fade-up p-5">
+        <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by title…"
+              className="h-11 w-full rounded-xl bg-white/[0.04] pl-10 pr-4 text-sm text-white ring-1 ring-white/[0.08] transition-all placeholder:text-zinc-600 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+            />
           </div>
-        ) : (
-          <p className="text-slate-500 text-center py-12">No songs found</p>
-        )}
+          <Button type="submit" variant="primary" size="lg" icon="search">
+            Search
+          </Button>
+        </form>
+      </Card>
+
+      <div className="animate-fade-up" style={{ animationDelay: '70ms' }}>
+        <Card className="overflow-hidden">
+          {(data?.songs.length ?? 0) > 0 ? (
+            <>
+              <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500">
+                  {data!.total} {data!.total === 1 ? 'track' : 'tracks'}
+                </p>
+                {query && (
+                  <button
+                    onClick={() => {
+                      setQuery('');
+                      setSearchTerm('');
+                      setPage(0);
+                    }}
+                    className="flex items-center gap-1.5 text-xs font-medium text-violet-300 transition-colors hover:text-violet-200"
+                  >
+                    <Icon name="x" className="h-3 w-3" />
+                    Clear search
+                  </button>
+                )}
+              </div>
+              <div className="divide-y divide-white/[0.05]">
+                {data!.songs.map((song, i) => (
+                  <SongRow
+                    key={song.id}
+                    song={song}
+                    index={i + 1}
+                    onAdd={handleAdd}
+                    adding={addingId === song.id}
+                    onDelete={() => setConfirmDelete(song)}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <EmptyState
+              icon="search"
+              title={query ? 'No matches found' : 'Library is empty'}
+              description={
+                query
+                  ? `Nothing in your library matches "${query}".`
+                  : 'Tracks you add to the queue will show up here.'
+              }
+            />
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3.5">
+              <span className="font-mono text-xs text-zinc-500">
+                {page + 1} / {totalPages}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  icon="chevron-left"
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  iconRight="chevron-right"
+                  disabled={page >= totalPages - 1}
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button
-            onClick={() => setPage(Math.max(0, page - 1))}
-            disabled={page === 0}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-slate-400 px-4">
-            Page {page + 1} of {totalPages}
-          </span>
-          <button
-            onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-            disabled={page >= totalPages - 1}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Modal
+        open={confirmDelete !== null}
+        tone="danger"
+        icon="trash"
+        title="Remove this track?"
+        description={
+          confirmDelete
+            ? `"${confirmDelete.title}" will be removed from your library. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Remove"
+        loading={deleting}
+        onConfirm={confirmRemove}
+        onClose={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
 
 function SongRow({
   song,
+  index,
   onAdd,
-  isAdding,
+  adding,
   onDelete,
-  isRemoving
 }: {
   song: SongDTO;
+  index: number;
   onAdd: (song: SongDTO) => void;
-  isAdding: boolean;
+  adding: boolean;
   onDelete: (song: SongDTO) => void;
-  isRemoving: boolean;
 }) {
   return (
-    <div className="flex items-center gap-4 p-4 hover:bg-slate-700/50 transition-colors">
-      <svg className="w-10 h-10 text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-      </svg>
-      <div className="flex-1 min-w-0">
-        <p className="text-white font-medium truncate">{song.title}</p>
-        <p className="text-xs text-slate-400 truncate mt-0.5">{song.origin}</p>
+    <div className="group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-white/[0.03]">
+      <span className="hidden w-6 text-right font-mono text-[11px] text-zinc-600 sm:block">{index}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06] transition-colors group-hover:bg-violet-500/[0.12] group-hover:ring-violet-500/20">
+        <Icon name="music" className="h-4 w-4 text-zinc-400 transition-colors group-hover:text-violet-300" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-zinc-100">{song.title}</p>
+        <p className="mt-0.5 truncate text-xs text-zinc-500">{song.origin}</p>
       </div>
-      <span className="text-sm text-slate-400 flex-shrink-0">{formatDuration(song.length)}</span>
-      <button
-        onClick={() => onAdd(song)}
-        disabled={isAdding}
-        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-      >
-        {isAdding ? '...' : 'Queue'}
-      </button>
-      <button
-        onClick={() => onDelete(song)}
-        disabled={isRemoving}
-        className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 disabled:opacity-50 text-red-400 rounded-lg text-sm font-medium transition-colors flex-shrink-0"
-      >
-        {isRemoving ? '...' : 'Remove'}
-      </button>
+      <span className="hidden font-mono text-xs text-zinc-500 md:block">{formatDuration(song.length)}</span>
+      <div className="flex shrink-0 items-center gap-1.5 opacity-60 transition-opacity group-hover:opacity-100">
+        <Button size="sm" variant="ghost" icon="plus" loading={adding} onClick={() => onAdd(song)}>
+          Queue
+        </Button>
+        <button
+          onClick={() => onDelete(song)}
+          title="Remove from library"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-red-500/[0.12] hover:text-red-300"
+        >
+          <Icon name="trash" className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SongsSkeleton() {
+  return (
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-40" />
+        <Skeleton className="h-4 w-56" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-2xl" />
+      <Skeleton className="h-[28rem] w-full rounded-2xl" />
     </div>
   );
 }

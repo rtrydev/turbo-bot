@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Turbo Bot Admin",
-  description: "Admin panel for Turbo Discord bot",
+  title: "Turbo Bot — Admin Console",
+  description: "Admin panel for the Turbo Discord music bot",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -25,10 +25,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex">
+      <body className="flex h-full overflow-hidden bg-[#07070b] text-zinc-100">
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
+        />
         <Sidebar />
         <ToastProvider>
-          <main className="flex-1 p-6 overflow-auto">{children}</main>
+          <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
         </ToastProvider>
       </body>
     </html>
