@@ -268,7 +268,7 @@ function SongRow({
         <p className="mt-0.5 truncate text-xs text-zinc-500">{song.origin}</p>
       </div>
       <span className="hidden font-mono text-xs text-zinc-500 md:block">{formatDuration(song.length)}</span>
-      <div className="flex shrink-0 items-center gap-1.5 opacity-60 transition-opacity group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1.5 opacity-100 transition-opacity sm:opacity-60 sm:group-hover:opacity-100">
         <Button size="sm" variant="ghost" icon="plus" loading={adding} onClick={() => onAdd(song)}>
           Queue
         </Button>
