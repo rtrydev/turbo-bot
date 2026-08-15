@@ -85,6 +85,10 @@ body {
   font-family: var(--font-sans);
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 ::selection {
   background: rgba(167, 139, 250, 0.35);
   color: #ffffff;
