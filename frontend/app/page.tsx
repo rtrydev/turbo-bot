@@ -101,7 +101,11 @@ export default function Dashboard() {
         </Card>
       )}
 
-      <div className="grid animate-fade-up gap-4 sm:grid-cols-3" style={{ animationDelay: '120ms' }}>
+      <div className="animate-fade-up" style={{ animationDelay: '120ms' }}>
+        <TransportBar queue={queue} />
+      </div>
+
+      <div className="grid animate-fade-up gap-4 sm:grid-cols-3" style={{ animationDelay: '180ms' }}>
         <StatCard
           icon="wifi"
           label="Connection"
@@ -123,10 +127,6 @@ export default function Dashboard() {
           value={queue?.repeat_enabled ? 'Enabled' : 'Disabled'}
           tone={queue?.repeat_enabled ? 'accent' : 'muted'}
         />
-      </div>
-
-      <div className="animate-fade-up" style={{ animationDelay: '180ms' }}>
-        <TransportBar queue={queue} />
       </div>
 
       <div className="animate-fade-up" style={{ animationDelay: '240ms' }}>
@@ -255,12 +255,12 @@ function DashboardSkeleton() {
         <Skeleton className="h-4 w-64" />
       </div>
       <Skeleton className="h-40 w-full rounded-2xl" />
+      <Skeleton className="h-24 w-full rounded-2xl" />
       <div className="grid gap-4 sm:grid-cols-3">
         <Skeleton className="h-[76px] rounded-2xl" />
         <Skeleton className="h-[76px] rounded-2xl" />
         <Skeleton className="h-[76px] rounded-2xl" />
       </div>
-      <Skeleton className="h-24 w-full rounded-2xl" />
     </div>
   );
 }

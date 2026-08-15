@@ -124,15 +124,15 @@ export default function QueuePage() {
         </div>
       </Card>
 
-      <div className="animate-fade-up" style={{ animationDelay: '70ms' }}>
-        <TransportBar queue={queue} />
-      </div>
-
       {queue?.currently_playing && (
-        <div className="animate-fade-up" style={{ animationDelay: '140ms' }}>
+        <div className="animate-fade-up" style={{ animationDelay: '70ms' }}>
           <NowPlaying queue={queue} />
         </div>
       )}
+
+      <div className="animate-fade-up" style={{ animationDelay: '140ms' }}>
+        <TransportBar queue={queue} />
+      </div>
 
       <div className="animate-fade-up" style={{ animationDelay: '210ms' }}>
         <Card className="overflow-hidden">
