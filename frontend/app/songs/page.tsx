@@ -24,6 +24,8 @@ export default function SongsPage() {
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<SongDTO | null>(null);
+  const [libraryUrl, setLibraryUrl] = useState('');
+  const [addingToLibrary, setAddingToLibrary] = useState(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -64,6 +66,26 @@ export default function SongsPage() {
     }
   };
 
+  const handleAddToLibrary = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!libraryUrl.trim()) return;
+    setAddingToLibrary(true);
+    try {
+      await api.addSongToLibrary(libraryUrl.trim());
+      showToast('Track added to library', 'success');
+      setLibraryUrl('');
+      setSearchTerm('');
+      setQuery('');
+      setPage(0);
+      const result = await api.listSongs('', 0, LIMIT);
+      setData(result);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to add track', 'error');
+    } finally {
+      setAddingToLibrary(false);
+    }
+  };
+
   const confirmRemove = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
@@ -90,6 +112,25 @@ export default function SongsPage() {
       />
 
       <Card className="animate-fade-up p-5">
+        <form onSubmit={handleAddToLibrary} className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Icon name="link" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <input
+              type="text"
+              value={libraryUrl}
+              onChange={(e) => setLibraryUrl(e.target.value)}
+              placeholder="Paste a YouTube URL…"
+              className="h-11 w-full rounded-xl bg-white/[0.04] pl-10 pr-4 text-sm text-white ring-1 ring-white/[0.08] transition-all placeholder:text-zinc-600 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+            />
+          </div>
+          <Button type="submit" variant="primary" size="lg" icon="plus" loading={addingToLibrary} disabled={!libraryUrl.trim()}>
+            Add to library
+          </Button>
+        </form>
+        <p className="mt-3 text-xs text-zinc-500">Saves the track to your library without adding it to the queue.</p>
+      </Card>
+
+      <Card className="animate-fade-up p-5" style={{ animationDelay: '70ms' }}>
         <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
             <Icon name="search" className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -107,7 +148,7 @@ export default function SongsPage() {
         </form>
       </Card>
 
-      <div className="animate-fade-up" style={{ animationDelay: '70ms' }}>
+      <div className="animate-fade-up" style={{ animationDelay: '140ms' }}>
         <Card className="overflow-hidden">
           {(data?.songs.length ?? 0) > 0 ? (
             <>
@@ -149,7 +190,7 @@ export default function SongsPage() {
               description={
                 query
                   ? `Nothing in your library matches "${query}".`
-                  : 'Tracks you add to the queue will show up here.'
+                  : 'Paste a YouTube link above to add your first track.'
               }
             />
           )}

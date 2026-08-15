@@ -1,4 +1,4 @@
-import type { ConnectionStatusDTO, QueueStateDTO, SongsListResponseDTO } from '@/lib/types';
+import type { ConnectionStatusDTO, QueueStateDTO, SongDTO, SongsListResponseDTO } from '@/lib/types';
 
 let apiBase = '';
 
@@ -38,6 +38,8 @@ export const api = {
     fetchAPI<SongsListResponseDTO>(`/api/songs?q=${encodeURIComponent(query || '')}&page=${page}&limit=${limit}`),
   deleteSong: (id: string) =>
     fetchAPI<Record<string, unknown>>(`/api/songs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  addSongToLibrary: (origin: string) =>
+    fetchAPI<SongDTO>('/api/songs', { method: 'POST', body: JSON.stringify({ origin }) }),
 
   addSong: (origin: string) =>
     fetchAPI<Record<string, unknown>>('/api/queue/add', { method: 'POST', body: JSON.stringify({ origin }) }),
