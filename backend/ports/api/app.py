@@ -55,6 +55,7 @@ def create_app(mediator: Mediator) -> web.Application:
     app.router.add_post('/api/queue/skip', skip_song)
     app.router.add_post('/api/queue/repeat', toggle_repeat)
     app.router.add_get('/api/songs', list_songs)
+    app.router.add_post('/api/songs', add_song_to_library)
     app.router.add_delete('/api/songs/{id}', delete_song)
 
     return app
@@ -151,6 +152,22 @@ async def toggle_repeat(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(ToggleRepeatCommand())
         return web.json_response({'message': 'Toggled repeat mode'})
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
+
+async def add_song_to_library(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+        origin = body.get('origin')
+
+        if not origin:
+            return web.json_response({'error': 'origin is required'}, status=400)
+
+        song = request.app['mediator'].send(CreateSongCommand(origin=origin))
+        return web.json_response(serialize(song))
+    except ValueError as e:
+        return web.json_response({'error': str(e)}, status=404)
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
