@@ -1,39 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { api } from '@/lib/api';
-import type { ConnectionStatusDTO } from '@/lib/types';
-import { Icon, type IconName } from '@/components/ui/Icon';
-
-const navItems: { label: string; href: string; icon: IconName }[] = [
-  { label: 'Dashboard', href: '/', icon: 'grid' },
-  { label: 'Queue', href: '/queue', icon: 'list' },
-  { label: 'Songs', href: '/songs', icon: 'library' },
-];
+import { navItems } from '@/lib/nav';
+import { useConnectionStatus } from '@/lib/status';
+import { Icon } from '@/components/ui/Icon';
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [status, setStatus] = useState<ConnectionStatusDTO | null>(null);
-
-  useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        setStatus(await api.getStatus());
-      } catch {
-        // ignore polling errors
-      }
-    };
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
+  const status = useConnectionStatus();
   const connected = status?.connected ?? false;
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/70 backdrop-blur-2xl">
+    <aside className="hidden h-full w-64 shrink-0 flex-col border-r border-white/[0.06] bg-zinc-950/70 backdrop-blur-2xl lg:flex">
       <div className="px-5 pb-5 pt-6">
         <div className="flex items-center gap-3">
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-fuchsia-500/25">

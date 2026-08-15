@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import { MobileHeader } from "@/components/MobileHeader";
+import { MobileTabBar } from "@/components/MobileTabBar";
 import { ToastProvider } from "@/lib/toast";
 
 const geistSans = Geist({
@@ -19,6 +21,13 @@ export const metadata: Metadata = {
   description: "Admin panel for the Turbo Discord music bot",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -32,7 +41,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <Sidebar />
         <ToastProvider>
-          <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
+          <div className="flex min-w-0 flex-1 flex-col">
+            <MobileHeader />
+            <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">{children}</main>
+            <MobileTabBar />
+          </div>
         </ToastProvider>
       </body>
     </html>
