@@ -143,7 +143,7 @@ export default function QueuePage() {
             </span>
           </div>
           {songCount > 0 ? (
-            <div className="max-h-[28rem] divide-y divide-white/[0.05] overflow-y-auto">
+            <div className="divide-y divide-white/[0.05]">
               {queue!.songs.map((song, i) => (
                 <QueueRow key={song.id} song={song} index={i + 1} />
               ))}
