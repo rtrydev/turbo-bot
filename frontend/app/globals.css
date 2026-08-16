@@ -2,6 +2,8 @@
 
 :root {
   color-scheme: dark;
+  --app-background: #07070b;
+  --app-chrome: #09090b;
 }
 
 @theme {
@@ -80,9 +82,34 @@
 }
 
 body {
-  background: #07070b;
+  background: var(--app-chrome);
   color: #f4f4f8;
   font-family: var(--font-sans);
+}
+
+html,
+body {
+  background: var(--app-chrome);
+  min-height: 100%;
+}
+
+.app-body {
+  height: 100%;
+}
+
+.mobile-header {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.mobile-tab-bar {
+  padding-bottom: max(0.625rem, env(safe-area-inset-bottom, 0px));
+}
+
+@supports (height: 100dvh) {
+  .app-body {
+    height: 100dvh;
+    min-height: 100svh;
+  }
 }
 
 button:not(:disabled) {
