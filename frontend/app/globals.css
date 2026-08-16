@@ -79,6 +79,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: #07070b;
   color: #f4f4f8;
