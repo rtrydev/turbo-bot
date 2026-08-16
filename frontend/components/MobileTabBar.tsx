@@ -11,7 +11,7 @@ export function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="mobile-tab-bar fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl lg:hidden"
+      className="mobile-tab-bar fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.06] bg-zinc-950/95 pb-0 backdrop-blur-2xl lg:hidden"
     >
       <div className="flex items-stretch">
         {navItems.map((item) => {
