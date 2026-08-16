@@ -85,14 +85,23 @@ body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  height: -webkit-fill-available;
+  height: 100dvh;
 }
 
 main {
   overscroll-behavior-y: none;
 }
 
-@supports not (height: 100dvh) {
+/* Installed (standalone) PWA: the browser toolbar is gone, yet the layout
+   viewport can still be measured as if it were present, which leaves a blank
+   strip below the tab bar. -webkit-fill-available reports the true window
+   height so the app runs edge to edge; 100% covers engines without the WebKit
+   value (e.g. Android Chrome). */
+@media (display-mode: standalone) {
+  html,
   body {
+    height: 100%;
     height: -webkit-fill-available;
   }
 }
