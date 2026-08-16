@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { MobileTabBar } from "@/components/MobileTabBar";
+import { ViewportHeight } from "@/components/ViewportHeight";
 import { ToastProvider } from "@/lib/toast";
 
 const geistSans = Geist({
@@ -46,6 +48,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex overflow-hidden bg-[#07070b] text-zinc-100">
+        <ViewportHeight />
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
@@ -59,6 +62,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           </div>
         </ToastProvider>
       </body>
+      <Script src="/viewport-height.js" strategy="beforeInteractive" />
     </html>
   );
 }

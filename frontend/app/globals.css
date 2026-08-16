@@ -85,25 +85,14 @@ body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
-  height: -webkit-fill-available;
-  height: 100dvh;
+  /* Sized by the VisualViewport API via --app-viewport-height (see
+     components/ViewportHeight.tsx) so installed PWAs run edge to edge; falls
+     back to the dynamic viewport height before the script runs. */
+  height: var(--app-viewport-height, 100dvh);
 }
 
 main {
   overscroll-behavior-y: none;
-}
-
-/* Installed (standalone) PWA: the browser toolbar is gone, yet the layout
-   viewport can still be measured as if it were present, which leaves a blank
-   strip below the tab bar. -webkit-fill-available reports the true window
-   height so the app runs edge to edge; 100% covers engines without the WebKit
-   value (e.g. Android Chrome). */
-@media (display-mode: standalone) {
-  html,
-  body {
-    height: 100%;
-    height: -webkit-fill-available;
-  }
 }
 
 button:not(:disabled) {
