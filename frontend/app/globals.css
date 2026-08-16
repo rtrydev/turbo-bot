@@ -91,6 +91,12 @@ main {
   overscroll-behavior-y: none;
 }
 
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .mobile-tab-bar {
+    padding-bottom: 0;
+  }
+}
+
 button:not(:disabled) {
   cursor: pointer;
 }
