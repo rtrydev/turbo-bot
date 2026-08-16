@@ -16,9 +16,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const themeColor = "#07070b";
+
 export const metadata: Metadata = {
   title: "Turbo Bot — Admin Console",
   description: "Admin panel for the Turbo Discord music bot",
+  applicationName: "Turbo Bot",
+  appleWebApp: {
+    capable: true,
+    title: "Turbo Bot",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -26,6 +35,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
+  themeColor,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -34,19 +45,23 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex h-full overflow-hidden bg-[#07070b] text-zinc-100">
+      <body className="flex min-h-full flex-col overflow-hidden bg-[#07070b] text-zinc-100">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
         />
-        <Sidebar />
-        <ToastProvider>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <MobileHeader />
-            <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">{children}</main>
-            <MobileTabBar />
-          </div>
-        </ToastProvider>
+        <div className="app-shell fixed inset-0 flex overflow-hidden">
+          <Sidebar />
+          <ToastProvider>
+            <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+              <MobileHeader />
+              <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+                {children}
+              </main>
+              <MobileTabBar />
+            </div>
+          </ToastProvider>
+        </div>
       </body>
     </html>
   );

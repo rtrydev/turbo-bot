@@ -79,10 +79,22 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: #07070b;
   color: #f4f4f8;
   font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+main {
+  overscroll-behavior-y: none;
 }
 
 button:not(:disabled) {
