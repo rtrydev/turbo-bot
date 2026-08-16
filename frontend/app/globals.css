@@ -92,6 +92,10 @@ main {
 }
 
 @media (display-mode: standalone), (display-mode: fullscreen) {
+  .app-shell {
+    height: 100lvh;
+  }
+
   .mobile-tab-bar {
     padding-bottom: 0;
   }

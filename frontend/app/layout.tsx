@@ -50,7 +50,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
         />
-        <div className="fixed inset-0 flex overflow-hidden">
+        <div className="app-shell fixed inset-0 flex overflow-hidden">
           <Sidebar />
           <ToastProvider>
             <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
