@@ -8,7 +8,7 @@ export function MobileHeader() {
   const connected = status?.connected ?? false;
 
   return (
-    <header className="shrink-0 border-b border-white/[0.06] bg-zinc-950/70 backdrop-blur-2xl lg:hidden">
+    <header className="shrink-0 border-b border-white/[0.06] bg-zinc-950/70 pt-[env(safe-area-inset-top)] backdrop-blur-2xl lg:hidden">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
           <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-lg shadow-fuchsia-500/25">

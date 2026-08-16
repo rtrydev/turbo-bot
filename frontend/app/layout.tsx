@@ -16,9 +16,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const themeColor = "#07070b";
+
 export const metadata: Metadata = {
   title: "Turbo Bot — Admin Console",
   description: "Admin panel for the Turbo Discord music bot",
+  applicationName: "Turbo Bot",
+  appleWebApp: {
+    capable: true,
+    title: "Turbo Bot",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: { telephone: false },
 };
 
 export const viewport: Viewport = {
@@ -26,6 +35,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
+  themeColor,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
