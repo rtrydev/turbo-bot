@@ -45,19 +45,29 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex overflow-hidden bg-[#07070b] text-zinc-100">
+      <body className="overflow-hidden bg-[#07070b] text-zinc-100">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
         />
-        <Sidebar />
-        <ToastProvider>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <MobileHeader />
-            <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">{children}</main>
-            <MobileTabBar />
-          </div>
-        </ToastProvider>
+        {/* The shell is pinned to the viewport like langler-ui's AppShell. On an
+            iOS PWA the CSS layout viewport (what 100% / 100dvh / the
+            VisualViewport API resolve against) is smaller than the real
+            window, so a body-sized shell leaves a blank strip below the tab
+            bar; fixed inset-0 spans the full screen. The header and tab bar
+            keep the notch and home indicator out via env(safe-area-inset-*). */}
+        <div className="fixed inset-0 flex overflow-hidden">
+          <Sidebar />
+          <ToastProvider>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <MobileHeader />
+              <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+                {children}
+              </main>
+              <MobileTabBar />
+            </div>
+          </ToastProvider>
+        </div>
       </body>
     </html>
   );

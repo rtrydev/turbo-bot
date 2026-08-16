@@ -85,13 +85,6 @@ body {
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
-  /* Track the layout viewport (what html's height: 100% resolves to), not the
-     dynamic one: in an installed (standalone) PWA on iOS, 100dvh and the
-     VisualViewport API still measure as if the browser toolbar were present,
-     leaving a blank strip below the app, while the layout viewport is the
-     true window size. The header and tab bar add env(safe-area-inset-*)
-     padding for the notch and home indicator. */
-  height: 100%;
 }
 
 main {
