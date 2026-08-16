@@ -91,6 +91,12 @@ main {
   overscroll-behavior-y: none;
 }
 
+@supports not (height: 100dvh) {
+  body {
+    height: -webkit-fill-available;
+  }
+}
+
 button:not(:disabled) {
   cursor: pointer;
 }
