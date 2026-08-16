@@ -3,6 +3,7 @@
 :root {
   color-scheme: dark;
   --app-background: #07070b;
+  --app-chrome: #09090b;
 }
 
 @theme {
@@ -81,13 +82,14 @@
 }
 
 body {
-  background: var(--app-background);
+  background: var(--app-chrome);
   color: #f4f4f8;
   font-family: var(--font-sans);
 }
 
 html,
 body {
+  background: var(--app-chrome);
   min-height: 100%;
 }
 

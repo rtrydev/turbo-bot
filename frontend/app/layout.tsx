@@ -51,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="app-body flex h-full overflow-hidden bg-[#07070b] text-zinc-100">
+      <body className="app-body flex h-full overflow-hidden bg-[#09090b] text-zinc-100">
         <div
           aria-hidden
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
@@ -60,7 +60,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ToastProvider>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <MobileHeader />
-            <main className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">{children}</main>
+            <main className="min-h-0 flex-1 overflow-auto bg-[#07070b] p-4 sm:p-6 lg:p-8">{children}</main>
             <MobileTabBar />
           </div>
         </ToastProvider>
