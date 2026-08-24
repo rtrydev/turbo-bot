@@ -1,6 +1,7 @@
 import type { ConnectionStatusDTO, QueueStateDTO, SongDTO, SongsListResponseDTO } from '@/lib/types';
 
 let apiBase = '';
+let wsBase = '';
 
 async function resolveApiBase(): Promise<string> {
   if (apiBase) return apiBase;
@@ -8,10 +9,18 @@ async function resolveApiBase(): Promise<string> {
     const res = await fetch('/api/config');
     const data = await res.json();
     apiBase = data.apiUrl || 'http://localhost:8080';
+    wsBase = data.wsUrl || apiBase.replace(/^http/, 'ws');
   } catch {
     apiBase = 'http://localhost:8080';
+    wsBase = 'ws://localhost:8080';
   }
   return apiBase;
+}
+
+/** Resolve the websocket base URL (e.g. `ws://host:8080`). */
+export async function resolveWsBase(): Promise<string> {
+  if (!wsBase) await resolveApiBase();
+  return wsBase;
 }
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {

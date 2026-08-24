@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { useBotSocket, setOptimistic } from '@/lib/socket';
 import type { ConnectionStatusDTO, QueueStateDTO } from '@/lib/types';
 import { formatDuration } from '@/lib/format';
 import { PageHeader } from '@/components/PageHeader';
@@ -17,23 +18,24 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 
 export default function Dashboard() {
-  const [queue, setQueue] = useState<QueueStateDTO | null>(null);
-  const [status, setStatus] = useState<ConnectionStatusDTO | null>(null);
-  const [loading, setLoading] = useState(true);
+  const bot = useBotSocket();
+  const { queue, status } = bot;
 
+  // Fallback: if the websocket never delivers a snapshot (blocked, offline,
+  // etc.) poll the REST API and push the result into the shared socket state.
+  // This is a safety net only — the socket is the primary, push-based source.
   useEffect(() => {
+    if (bot.hasSnapshot) return;
     let cancelled = false;
     const load = async () => {
+      if (cancelled) return;
       try {
         const [q, s] = await Promise.all([api.getQueue(), api.getStatus()]);
-        if (!cancelled) {
-          setQueue(q);
-          setStatus(s);
-        }
+        if (cancelled) return;
+        if (q) setOptimistic('queue', q);
+        if (s) setOptimistic('status', s);
       } catch {
-        // Silently handle polling errors
-      } finally {
-        if (!cancelled) setLoading(false);
+        // keep skeleton if this poll also fails
       }
     };
     load();
@@ -42,8 +44,11 @@ export default function Dashboard() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [bot.hasSnapshot]);
 
+  // The skeleton is purely a function of whether we have data yet — no
+  // effect-driven setState needed.
+  const loading = !bot.hasSnapshot && (queue === null || status === null);
   if (loading) return <DashboardSkeleton />;
 
   const song = queue?.currently_playing ?? null;
