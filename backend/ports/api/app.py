@@ -104,7 +104,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     so a freshly opened tab is immediately correct and does not have to
     wait for the next mutation. Thereafter it receives only change events.
     """
-    ws = web.WebSocketResponse(heartbeat=25.0, max_msg_size=2 ** 20)
+    ws = web.WebSocketResponse(heartbeat=25.0, receive_timeout=45.0, max_msg_size=2 ** 20)
     await ws.prepare(request)
 
     hub: Hub = request.app['hub']
@@ -133,13 +133,15 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             await ws.send_json({'event': 'error', 'message': str(exc)})
 
         # Keep the socket alive until the client disconnects. The aiohttp
-        # heartbeat (set on WebSocketResponse) handles keepalives, and any
-        # server-side publish() calls flow through this same socket.
+        # heartbeat (set on WebSocketResponse) sends protocol-level pings and
+        # drops the connection if no pong arrives; receive_timeout additionally
+        # caps a dead peer that never sends anything.
         while not ws.closed:
             msg = await ws.receive()
             if msg.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSING, aiohttp.WSMsgType.CLOSED):
                 break
-            # Ignore any client frames; the admin UI is read-only.
+            # Client application frames (e.g. explicit "ping" JSON) are ignored;
+            # the admin UI is read-only and the server is the source of truth.
     finally:
         await hub.unregister(ws)
     return ws

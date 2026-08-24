@@ -64,6 +64,9 @@ class Hub:
         dead: list[web.WebSocketResponse] = []
         for ws in list(self._clients):
             try:
+                if ws.closed:
+                    dead.append(ws)
+                    continue
                 await ws.send_json(message)
             except Exception as exc:  # noqa: BLE001 - intentional broad catch
                 logger.debug('WS send failed, dropping client: %s', exc)
@@ -72,3 +75,4 @@ class Hub:
             async with self._lock:
                 for ws in dead:
                     self._clients.discard(ws)
+            logger.debug('WS pruned %d dead client(s)', len(dead))

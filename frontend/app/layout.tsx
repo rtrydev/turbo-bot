@@ -5,6 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import { MobileHeader } from "@/components/MobileHeader";
 import { MobileTabBar } from "@/components/MobileTabBar";
 import { ToastProvider } from "@/lib/toast";
+import { BotSocketProvider } from "@/components/BotSocketProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,13 +58,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55rem_35rem_at_50%_-12%,rgba(139,92,246,0.07),transparent_70%)]"
         />
         <Sidebar />
-        <ToastProvider>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <MobileHeader />
-            <main className="min-h-0 flex-1 overflow-auto bg-[#07070b] p-4 sm:p-6 lg:p-8">{children}</main>
-            <MobileTabBar />
-          </div>
-        </ToastProvider>
+        <BotSocketProvider>
+          <ToastProvider>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <MobileHeader />
+              <main className="min-h-0 flex-1 overflow-auto bg-[#07070b] p-4 sm:p-6 lg:p-8">{children}</main>
+              <MobileTabBar />
+            </div>
+          </ToastProvider>
+        </BotSocketProvider>
       </body>
     </html>
   );
