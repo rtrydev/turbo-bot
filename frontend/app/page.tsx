@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useBotSocket, setOptimistic } from '@/lib/socket';
-import type { ConnectionStatusDTO, QueueStateDTO } from '@/lib/types';
+import type { QueueStateDTO } from '@/lib/types';
 import { formatDuration } from '@/lib/format';
 import { PageHeader } from '@/components/PageHeader';
 import { playbackState } from '@/components/NowPlaying';
@@ -59,7 +59,6 @@ export default function Dashboard() {
       <PageHeader
         title="Dashboard"
         subtitle="Live overview of your bot"
-        action={<ConnectionChip status={status} />}
       />
 
       {song ? (
@@ -112,6 +111,12 @@ export default function Dashboard() {
 
       <div className="grid animate-fade-up gap-4 sm:grid-cols-3" style={{ animationDelay: '180ms' }}>
         <StatCard
+          icon="wifi"
+          label="Connection"
+          value={status?.connected ? (status.channel_name ?? 'Connected') : 'Disconnected'}
+          tone={status?.connected ? 'good' : 'bad'}
+        />
+        <StatCard
           icon="list"
           label="Queue depth"
           value={`${queue?.songs.length ?? 0} ${queue?.songs.length === 1 ? 'song' : 'songs'}`}
@@ -127,27 +132,6 @@ export default function Dashboard() {
       <div className="animate-fade-up" style={{ animationDelay: '240ms' }}>
         <UpNextCard queue={queue} />
       </div>
-    </div>
-  );
-}
-
-function ConnectionChip({ status }: { status: ConnectionStatusDTO | null }) {
-  const connected = status?.connected ?? false;
-  return (
-    <div
-      className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ring-1 ${
-        connected
-          ? 'bg-emerald-500/[0.08] text-emerald-300 ring-emerald-500/25'
-          : 'bg-red-500/[0.08] text-red-300 ring-red-500/25'
-      }`}
-    >
-      <span className="relative flex h-1.5 w-1.5">
-        {connected && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-        )}
-        <span className={`relative h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
-      </span>
-      {connected ? (status?.channel_name ?? 'Connected') : 'Offline'}
     </div>
   );
 }
