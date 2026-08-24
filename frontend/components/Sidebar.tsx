@@ -82,9 +82,6 @@ export default function Sidebar() {
             <p className="truncate text-xs font-medium text-zinc-200">
               {connected ? (status?.channel_name || 'Connected') : 'Disconnected'}
             </p>
-            <p className="truncate text-[11px] text-zinc-500">
-              {connected ? 'Bot online' : 'Bot offline'}
-            </p>
           </div>
         </div>
       </div>

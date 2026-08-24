@@ -112,12 +112,6 @@ export default function Dashboard() {
 
       <div className="grid animate-fade-up gap-4 sm:grid-cols-3" style={{ animationDelay: '180ms' }}>
         <StatCard
-          icon="wifi"
-          label="Connection"
-          value={status?.connected ? (status.channel_name ?? 'Connected') : 'Disconnected'}
-          tone={status?.connected ? 'good' : 'bad'}
-        />
-        <StatCard
           icon="list"
           label="Queue depth"
           value={`${queue?.songs.length ?? 0} ${queue?.songs.length === 1 ? 'song' : 'songs'}`}
