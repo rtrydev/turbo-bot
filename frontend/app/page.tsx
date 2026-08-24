@@ -114,11 +114,7 @@ export default function Dashboard() {
         <StatCard
           icon="wifi"
           label="Connection"
-          value={
-            status?.connected
-              ? status.channel_name ?? 'Online'
-              : 'Disconnected'
-          }
+          value={status?.connected ? (status.channel_name ?? 'Connected') : 'Disconnected'}
           tone={status?.connected ? 'good' : 'bad'}
         />
         <StatCard
@@ -157,7 +153,7 @@ function ConnectionChip({ status }: { status: ConnectionStatusDTO | null }) {
         )}
         <span className={`relative h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
       </span>
-      {connected ? (status?.channel_name ?? 'Online') : 'Offline'}
+      {connected ? (status?.channel_name ?? 'Connected') : 'Offline'}
     </div>
   );
 }

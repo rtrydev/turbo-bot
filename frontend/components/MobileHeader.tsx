@@ -36,7 +36,7 @@ export function MobileHeader() {
             )}
             <span className={`relative h-1.5 w-1.5 rounded-full ${connected ? 'bg-emerald-400' : 'bg-red-400'}`} />
           </span>
-          {connected ? 'Online' : 'Offline'}
+          {connected ? (status?.channel_name || 'Online') : 'Offline'}
         </span>
       </div>
     </header>
