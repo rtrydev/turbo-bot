@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useBotSocket, setOptimistic } from '@/lib/socket';
 import { useToast } from '@/lib/toast';
 import type { SongDTO, SongsListResponseDTO } from '@/lib/types';
 import { formatDuration } from '@/lib/format';
@@ -16,11 +17,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const LIMIT = 25;
 
 export default function SongsPage() {
-  const [data, setData] = useState<SongsListResponseDTO | null>(null);
+  const bot = useBotSocket();
   const [query, setQuery] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<SongDTO | null>(null);
@@ -28,25 +28,42 @@ export default function SongsPage() {
   const [addingToLibrary, setAddingToLibrary] = useState(false);
   const { showToast } = useToast();
 
+  // Fallback: if the socket never connects, fetch the page directly and push
+  // it into the shared socket state so the library still renders.
   useEffect(() => {
+    if (bot.hasSnapshot) return;
     let cancelled = false;
     const load = async () => {
+      if (cancelled) return;
       try {
         const result = await api.listSongs(query, page, LIMIT);
-        if (!cancelled) setData(result);
+        if (cancelled) return;
+        setOptimistic('library', result);
       } catch {
-        // Silently handle errors
-      } finally {
-        if (!cancelled) setLoading(false);
+        // keep skeleton
       }
     };
     load();
     return () => {
       cancelled = true;
     };
-  }, [query, page]);
+  }, [bot.hasSnapshot, query, page]);
 
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / LIMIT)) : 1;
+  // Derive the visible page from the shared socket state. This is pure and
+  // re-runs whenever the library changes (add/delete from any tab) or the
+  // user searches / paginates.
+  const base: SongsListResponseDTO =
+    bot.library ?? { songs: [], total: 0, page: 0, limit: LIMIT };
+  const start = page * LIMIT;
+  const data: SongsListResponseDTO = {
+    songs: base.songs.slice(start, start + LIMIT),
+    total: base.total,
+    page,
+    limit: LIMIT,
+  };
+  const loading = !bot.hasSnapshot && data.songs.length === 0;
+
+  const totalPages = Math.max(1, Math.ceil(data.total / LIMIT));
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,15 +87,15 @@ export default function SongsPage() {
     e.preventDefault();
     if (!libraryUrl.trim()) return;
     setAddingToLibrary(true);
+    // Optimistically drop any active search and reset to page 0 so the new
+    // track is the first thing shown the moment the server echoes it.
+    setLibraryUrl('');
+    setSearchTerm('');
+    setQuery('');
+    setPage(0);
     try {
       await api.addSongToLibrary(libraryUrl.trim());
       showToast('Track added to library', 'success');
-      setLibraryUrl('');
-      setSearchTerm('');
-      setQuery('');
-      setPage(0);
-      const result = await api.listSongs('', 0, LIMIT);
-      setData(result);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to add track', 'error');
     } finally {
@@ -89,13 +106,25 @@ export default function SongsPage() {
   const confirmRemove = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
+    const targetId = confirmDelete.id;
+    // Optimistically remove the row and decrement the count so the list
+    // updates instantly; the server publishes the new library state which
+    // reconciles (or the failure path rolls it back).
+    const base = bot.library;
+    if (base) {
+      setOptimistic('library', {
+        ...base,
+        songs: base.songs.filter((s) => s.id !== targetId),
+        total: Math.max(0, base.total - 1),
+      });
+    }
     try {
-      await api.deleteSong(confirmDelete.id);
+      await api.deleteSong(targetId);
       showToast(`"${confirmDelete.title}" removed`, 'success');
       setConfirmDelete(null);
-      const result = await api.listSongs(query, page, LIMIT);
-      setData(result);
     } catch (err) {
+      // Roll back the optimistic removal on failure.
+      if (base) setOptimistic('library', base);
       showToast(err instanceof Error ? err.message : 'Failed to remove song', 'error');
     } finally {
       setDeleting(false);

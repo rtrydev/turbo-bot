@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/lib/toast';
+import { setOptimistic } from '@/lib/socket';
 import type { QueueStateDTO } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -19,12 +20,23 @@ export function TransportBar({ queue }: TransportBarProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
+  // Optimistically apply a transport action to the shared socket state, issue
+  // the API call, and roll back on failure. The server publishes the real
+  // queue state over the socket afterwards, which reconciles the UI.
+  const run = async (
+    key: string,
+    fn: () => Promise<unknown>,
+    ok: string,
+    apply?: (q: QueueStateDTO) => QueueStateDTO,
+  ) => {
     setBusy(key);
+    const prev = queue;
+    if (prev && apply) setOptimistic('queue', apply(prev));
     try {
       await fn();
       showToast(ok, 'success');
     } catch (err) {
+      if (prev && apply) setOptimistic('queue', prev); // roll back
       showToast(err instanceof Error ? err.message : 'Action failed', 'error');
     } finally {
       setBusy(null);
@@ -36,18 +48,21 @@ export function TransportBar({ queue }: TransportBarProps) {
   const queueLength = queue?.songs.length ?? 0;
 
   const handleMain = () => {
-    if (isPlaying) return run('main', api.pausePlayback, 'Playback paused');
-    if (isPaused) return run('main', api.resumePlayback, 'Playback resumed');
-    return run('main', api.startPlayback, 'Playback started');
+    if (isPlaying) return run('main', api.pausePlayback, 'Playback paused', (q) => ({ ...q, is_playing: false, is_paused: true }));
+    if (isPaused) return run('main', api.resumePlayback, 'Playback resumed', (q) => ({ ...q, is_playing: true, is_paused: false }));
+    return run('main', api.startPlayback, 'Playback started', (q) => ({ ...q, is_playing: true, is_paused: false }));
   };
 
   const handleClear = async () => {
     setClearing(true);
+    const prev = queue;
+    if (prev) setOptimistic('queue', { ...prev, songs: [] });
     try {
       await api.clearQueue();
       showToast('Queue cleared', 'success');
       setConfirmClear(false);
     } catch (err) {
+      if (prev) setOptimistic('queue', prev); // roll back
       showToast(err instanceof Error ? err.message : 'Failed to clear queue', 'error');
     } finally {
       setClearing(false);
@@ -62,7 +77,7 @@ export function TransportBar({ queue }: TransportBarProps) {
             <ControlButton
               icon="skip"
               label="Skip"
-              onClick={() => run('skip', api.skipSong, 'Skipped to next song')}
+              onClick={() => run('skip', api.skipSong, 'Skipped to next song', (q) => ({ ...q, is_playing: q.is_playing || q.is_paused }))}
               busy={busy === 'skip'}
             />
             <button
@@ -78,7 +93,7 @@ export function TransportBar({ queue }: TransportBarProps) {
               icon="repeat"
               label="Repeat"
               active={queue?.repeat_enabled}
-              onClick={() => run('repeat', api.toggleRepeat, queue?.repeat_enabled ? 'Repeat off' : 'Repeat on')}
+              onClick={() => run('repeat', api.toggleRepeat, queue?.repeat_enabled ? 'Repeat off' : 'Repeat on', (q) => ({ ...q, repeat_enabled: !q.repeat_enabled }))}
               busy={busy === 'repeat'}
             />
           </div>

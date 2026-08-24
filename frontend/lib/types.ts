@@ -24,3 +24,12 @@ export interface SongsListResponseDTO {
   page: number;
   limit: number;
 }
+
+/** A single live event pushed over the backend websocket. */
+export type BotEvent =
+  | { event: 'snapshot'; data: { queue: QueueStateDTO | null; status: ConnectionStatusDTO | null; library: SongsListResponseDTO | null } }
+  | { event: 'queue'; data: QueueStateDTO }
+  | { event: 'status'; data: ConnectionStatusDTO }
+  | { event: 'library'; data: SongsListResponseDTO }
+  | { event: 'ping'; data: null }
+  | { event: 'error'; message: string };

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useBotSocket, setOptimistic } from '@/lib/socket';
 import { useToast } from '@/lib/toast';
-import type { QueueStateDTO, SongDTO } from '@/lib/types';
+import type { SongDTO } from '@/lib/types';
 import { formatDuration } from '@/lib/format';
 import { PageHeader } from '@/components/PageHeader';
 import { NowPlaying } from '@/components/NowPlaying';
@@ -15,24 +16,27 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 
 export default function QueuePage() {
-  const [queue, setQueue] = useState<QueueStateDTO | null>(null);
+  const bot = useBotSocket();
+  const queue = bot.queue;
   const [url, setUrl] = useState('');
   const [randomCount, setRandomCount] = useState(10);
-  const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [randomBusy, setRandomBusy] = useState(false);
   const { showToast } = useToast();
 
+  // Fallback poll if the websocket never connects, so the queue page still
+  // renders even when the socket is unavailable.
   useEffect(() => {
+    if (bot.hasSnapshot) return;
     let cancelled = false;
     const load = async () => {
+      if (cancelled) return;
       try {
         const q = await api.getQueue();
-        if (!cancelled) setQueue(q);
+        if (cancelled) return;
+        setOptimistic('queue', q);
       } catch {
-        // Silently handle polling errors
-      } finally {
-        if (!cancelled) setLoading(false);
+        // keep skeleton
       }
     };
     load();
@@ -41,17 +45,29 @@ export default function QueuePage() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [bot.hasSnapshot]);
+
+  const loading = !bot.hasSnapshot && queue === null;
 
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
+    const prev = queue;
     setAdding(true);
     try {
+      // Optimistic: bump the queue length locally so the "N tracks" chip and
+      // the list feel instant. The server publishes the authoritative queue
+      // over the socket and reconciles (the exact new song title appears as
+      // soon as it round-trips).
+      if (prev) {
+        setOptimistic('queue', { ...prev, songs: [...prev.songs, { id: `pending-${Date.now()}`, title: url.trim(), length: 0, origin: url.trim() }] });
+      }
       await api.addSong(url.trim());
       showToast('Song added to queue', 'success');
       setUrl('');
     } catch (err) {
+      // Roll back the optimistic row if the server rejected the add.
+      if (prev) setOptimistic('queue', prev);
       showToast(err instanceof Error ? err.message : 'Failed to add song', 'error');
     } finally {
       setAdding(false);
