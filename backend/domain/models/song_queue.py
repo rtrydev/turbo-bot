@@ -14,10 +14,15 @@ class SongQueue:
     (add / add-random / clear / skip), the Discord bot (advancing to the
     next track) and the download worker. All of those share the *same*
     ``SongQueue`` instance, so every mutating operation is serialized
-    through a single re-entrant lock. Without it, concurrent random adds
-    could interleave with a queue advance and a song could end up enqueued
-    twice (or skipped), which shows up in the admin UI as duplicate rows
-    and "missing" tracks until the next full refresh.
+    through a single re-entrant lock. Without it, concurrent operations
+    could interleave with a queue advance and corrupt the list (a song
+    skipped, or the same entry appended twice), which shows up in the
+    admin UI as duplicate rows and "missing" tracks until the next full
+    refresh.
+
+    The lock guards against *torn* mutations only. It deliberately does
+    not remove duplicates: a track that the user genuinely added twice is
+    a real two-entry queue and must be preserved as-is.
     """
 
     __songs: list[Song]
@@ -55,19 +60,12 @@ class SongQueue:
         """Return a snapshot of the current queue.
 
         The snapshot is taken atomically under the mutation lock so the
-        caller never observes a half-mutated list, and it is deduplicated
-        as a safety net for any stale entries that predate this guard.
+        caller never observes a half-mutated list. Note this preserves
+        genuine duplicates (a track legitimately added twice) — it only
+        guards against *torn* reads, not against repeated entries.
         """
         with self.__lock:
-            songs = list(self.__songs)
-            seen: set[str] = set()
-            deduped: list[Song] = []
-            for song in songs:
-                if song.id in seen:
-                    continue
-                seen.add(song.id)
-                deduped.append(song)
-            return deduped
+            return list(self.__songs)
 
     def clear(self) -> None:
         with self.__lock:
