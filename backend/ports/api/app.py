@@ -1,3 +1,4 @@
+import asyncio
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
@@ -97,19 +98,44 @@ def create_app(mediator: Mediator) -> web.Application:
     return app
 
 
+async def _send_pings(ws: web.WebSocketResponse, interval: float = 20.0) -> None:
+    """Send application-level ping frames to keep idle links alive.
+
+    The aiohttp ``heartbeat`` already exercises the protocol (ping/pong), but
+    many intermediaries and the admin UI treat the absence of *application*
+    traffic as a sign the socket is dead. Emitting a JSON ping every
+    ``interval`` seconds keeps both the client's liveness watchdog and any
+    idle-timeout proxies happy without relying on real state changes.
+    """
+    try:
+        while not ws.closed:
+            await asyncio.sleep(interval)
+            if not ws.closed:
+                await ws.send_json({'event': EVENT_PING})
+    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+        # Cancellation is normal on disconnect; a broken peer is pruned by
+        # the hub on the next publish.
+        pass
+
+
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     """Long-lived socket the admin UI subscribes to for live state.
 
     On connect the server pushes a full snapshot (queue, status, library)
     so a freshly opened tab is immediately correct and does not have to
     wait for the next mutation. Thereafter it receives only change events.
+
+    The socket stays open until the client disconnects. A background task
+    sends application-level pings so the connection is never considered idle
+    by the client or by an intermediary proxy.
     """
-    ws = web.WebSocketResponse(heartbeat=25.0, receive_timeout=45.0, max_msg_size=2 ** 20)
+    ws = web.WebSocketResponse(heartbeat=25.0, max_msg_size=2 ** 20)
     await ws.prepare(request)
 
     hub: Hub = request.app['hub']
     mediator: Mediator = request.app['mediator']
     await hub.register(ws)
+    ping_task: asyncio.Task | None = None
     try:
         # Send a snapshot so the client converges without racing the first
         # change event. Errors here are non-fatal: the client will fall back
@@ -134,8 +160,10 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
 
         # Keep the socket alive until the client disconnects. The aiohttp
         # heartbeat (set on WebSocketResponse) sends protocol-level pings and
-        # drops the connection if no pong arrives; receive_timeout additionally
-        # caps a dead peer that never sends anything.
+        # drops the connection if no pong arrives. The ping task additionally
+        # sends application-level frames so idle links are never torn down by
+        # a client watchdog or an intermediary.
+        ping_task = asyncio.create_task(_send_pings(ws))
         while not ws.closed:
             msg = await ws.receive()
             if msg.type in (aiohttp.WSMsgType.CLOSE, aiohttp.WSMsgType.CLOSING, aiohttp.WSMsgType.CLOSED):
@@ -143,6 +171,12 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             # Client application frames (e.g. explicit "ping" JSON) are ignored;
             # the admin UI is read-only and the server is the source of truth.
     finally:
+        if ping_task is not None:
+            ping_task.cancel()
+            try:
+                await ping_task
+            except asyncio.CancelledError:
+                pass
         await hub.unregister(ws)
     return ws
 

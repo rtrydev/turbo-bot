@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { useBotSocket, setOptimistic } from '@/lib/socket';
+import { setOptimistic } from '@/lib/socket';
 import { useToast } from '@/lib/toast';
 import type { SongDTO, SongsListResponseDTO } from '@/lib/types';
 import { formatDuration } from '@/lib/format';
@@ -17,7 +17,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const LIMIT = 25;
 
 export default function SongsPage() {
-  const bot = useBotSocket();
   const [query, setQuery] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(0);
@@ -28,42 +27,42 @@ export default function SongsPage() {
   const [addingToLibrary, setAddingToLibrary] = useState(false);
   const { showToast } = useToast();
 
-  // Fallback: if the socket never connects, fetch the page directly and push
-  // it into the shared socket state so the library still renders.
+  // The socket snapshot only carries page 1 of the library (and no search
+  // filter), so pagination and search always go straight to the API. The
+  // result is mirrored into the shared socket state so the "add to library"
+  // flow — which relies on the server publishing the updated library — stays
+  // consistent with whatever the user is looking at.
+  const [data, setData] = useState<SongsListResponseDTO | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Pagination, search and every mutation (add/delete) go straight to the
+  // API — the socket snapshot only carries page 1 with no filter, and the
+  // API is the authoritative source. The result is mirrored into the shared
+  // socket state so other consumers of `bot.library` stay consistent.
   useEffect(() => {
-    if (bot.hasSnapshot) return;
     let cancelled = false;
-    const load = async () => {
-      if (cancelled) return;
-      try {
-        const result = await api.listSongs(query, page, LIMIT);
-        if (cancelled) return;
-        setOptimistic('library', result);
-      } catch {
-        // keep skeleton
-      }
-    };
+    const load = () =>
+      api
+        .listSongs(query, page, LIMIT)
+        .then((result) => {
+          if (cancelled) return;
+          setData(result);
+          setOptimistic('library', result);
+        })
+        .catch(() => {
+          // keep whatever we have; the socket will reconcile on the next event
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
     load();
     return () => {
       cancelled = true;
     };
-  }, [bot.hasSnapshot, query, page]);
+  }, [query, page, refreshKey]);
 
-  // Derive the visible page from the shared socket state. This is pure and
-  // re-runs whenever the library changes (add/delete from any tab) or the
-  // user searches / paginates.
-  const base: SongsListResponseDTO =
-    bot.library ?? { songs: [], total: 0, page: 0, limit: LIMIT };
-  const start = page * LIMIT;
-  const data: SongsListResponseDTO = {
-    songs: base.songs.slice(start, start + LIMIT),
-    total: base.total,
-    page,
-    limit: LIMIT,
-  };
-  const loading = !bot.hasSnapshot && data.songs.length === 0;
-
-  const totalPages = Math.max(1, Math.ceil(data.total / LIMIT));
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / LIMIT));
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +95,7 @@ export default function SongsPage() {
     try {
       await api.addSongToLibrary(libraryUrl.trim());
       showToast('Track added to library', 'success');
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Failed to add track', 'error');
     } finally {
@@ -107,24 +107,26 @@ export default function SongsPage() {
     if (!confirmDelete) return;
     setDeleting(true);
     const targetId = confirmDelete.id;
+    const title = confirmDelete.title;
     // Optimistically remove the row and decrement the count so the list
-    // updates instantly; the server publishes the new library state which
-    // reconciles (or the failure path rolls it back).
-    const base = bot.library;
-    if (base) {
+    // updates instantly. The page will then refetch from the API (the
+    // authoritative source); on failure the optimistic state is rolled back.
+    if (data) {
       setOptimistic('library', {
-        ...base,
-        songs: base.songs.filter((s) => s.id !== targetId),
-        total: Math.max(0, base.total - 1),
+        ...data,
+        songs: data.songs.filter((s) => s.id !== targetId),
+        total: Math.max(0, data.total - 1),
       });
     }
+    const prevData = data;
     try {
       await api.deleteSong(targetId);
-      showToast(`"${confirmDelete.title}" removed`, 'success');
+      showToast(`"${title}" removed`, 'success');
       setConfirmDelete(null);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       // Roll back the optimistic removal on failure.
-      if (base) setOptimistic('library', base);
+      if (prevData) setOptimistic('library', prevData);
       showToast(err instanceof Error ? err.message : 'Failed to remove song', 'error');
     } finally {
       setDeleting(false);

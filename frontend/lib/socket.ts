@@ -45,13 +45,6 @@ const listeners = new Set<Listener>();
 let ws: WebSocket | null = null;
 let attempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
-
-// Application-level liveness on top of the browser's automatic protocol pong:
-// the server pings every 25s (aiohttp heartbeat) and receives a hard timeout
-// if no traffic arrives; if we observe a quiet socket for this window we
-// treat it as dead and reconnect.
-const HEARTBEAT_TIMEOUT = 40000;
 
 // --- Optimistic updates ----------------------------------------------------
 //
@@ -118,29 +111,6 @@ function applyEvent(raw: string) {
   }
 }
 
-function clearHeartbeat() {
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer);
-    heartbeatTimer = null;
-  }
-}
-
-function startHeartbeat() {
-  clearHeartbeat();
-  heartbeatTimer = setInterval(() => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    // No server event recently: the link is likely dead even though the
-    // browser still reports OPEN. Force a clean reconnect.
-    if (Date.now() - state.lastEventAt > HEARTBEAT_TIMEOUT) {
-      try {
-        ws.close(4001, 'heartbeat timeout');
-      } catch {
-        // ignore
-      }
-    }
-  }, 10000);
-}
-
 function scheduleReconnect() {
   if (reconnectTimer) return;
   const delay = Math.min(30000, 500 * 2 ** attempt) + Math.random() * 250;
@@ -169,7 +139,6 @@ function open() {
 
     socket.onopen = () => {
       attempt = 0;
-      startHeartbeat();
       setState({ connected: true });
     };
 
@@ -178,7 +147,6 @@ function open() {
     };
 
     socket.onclose = () => {
-      clearHeartbeat();
       if (listeners.size > 0) {
         scheduleReconnect();
       }
@@ -191,7 +159,6 @@ function open() {
 }
 
 function close() {
-  clearHeartbeat();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
