@@ -32,7 +32,15 @@ class DeleteSongCommandHandler(RequestHandler[DeleteSongCommand, None]):
         if song is None:
             raise ValueError(f'Song with ID {request.id} not found in repository.')
 
-        self.__context_manager_service.get_queue_state().remove(song)
+        # Remove only queued (not yet played) occurrences. If the deleted
+        # track is the current one it keeps playing — the queue view is a
+        # snapshot of live state and must not "unplay" a song mid-track.
+        queue_state = self.__context_manager_service.get_queue_state()
+        current = queue_state.get_last_song()
+        if current is not None and current.id == song.id:
+            queue_state.remove_at_first(song)
+        else:
+            queue_state.remove(song)
 
         if song.fid is not None:
             self.__filesystem_service.delete_file(song.fid)

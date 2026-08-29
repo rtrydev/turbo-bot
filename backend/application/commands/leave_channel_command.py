@@ -22,9 +22,12 @@ class LeaveChannelCommandHandler(RequestHandler[LeaveChannelCommand, None]):
         self.__media_player_service = media_player_service
 
     def handle(self, request: LeaveChannelCommand) -> None:
+        # Reset the whole playback state: drop the queued tracks and the
+        # current song, and stop the audio. Leaving a channel ends the
+        # session entirely.
         queue_state = self.__context_manager_service.get_queue_state()
         queue_state.clear()
-        queue_state.skip()
+        queue_state.reset_current()
 
         channel = self.__channel_connection_provider.get_channel_connection()
         if channel is not None and (channel.is_playing() or channel.is_paused()):

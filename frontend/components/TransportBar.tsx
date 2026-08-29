@@ -20,9 +20,12 @@ export function TransportBar({ queue }: TransportBarProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  // Optimistically apply a transport action to the shared socket state, issue
-  // the API call, and roll back on failure. The server publishes the real
-  // queue state over the socket afterwards, which reconciles the UI.
+  // Issue the transport action and wait for the server's authoritative
+  // queue event over the socket to update the UI. Optimistic guessing is
+  // deliberately avoided for actions that mutate queue *contents* (skip,
+  // play, clear): the server state is always more correct than a local
+  // approximation, and applying a wrong guess and rolling it back is exactly
+  // the flicker/duplication the user would see otherwise.
   const run = async (
     key: string,
     fn: () => Promise<unknown>,
@@ -30,13 +33,11 @@ export function TransportBar({ queue }: TransportBarProps) {
     apply?: (q: QueueStateDTO) => QueueStateDTO,
   ) => {
     setBusy(key);
-    const prev = queue;
-    if (prev && apply) setOptimistic('queue', apply(prev));
     try {
       await fn();
       showToast(ok, 'success');
+      if (apply) setOptimistic('queue', apply(queue!));
     } catch (err) {
-      if (prev && apply) setOptimistic('queue', prev); // roll back
       showToast(err instanceof Error ? err.message : 'Action failed', 'error');
     } finally {
       setBusy(null);
@@ -47,6 +48,9 @@ export function TransportBar({ queue }: TransportBarProps) {
   const isPaused = queue?.is_paused ?? false;
   const queueLength = queue?.songs.length ?? 0;
 
+  // The server publishes the authoritative state right after the mutation;
+  // we just mirror the transport flags (a pure flag flip, no queue content
+  // change) so the button responds instantly.
   const handleMain = () => {
     if (isPlaying) return run('main', api.pausePlayback, 'Playback paused', (q) => ({ ...q, is_playing: false, is_paused: true }));
     if (isPaused) return run('main', api.resumePlayback, 'Playback resumed', (q) => ({ ...q, is_playing: true, is_paused: false }));
@@ -55,14 +59,11 @@ export function TransportBar({ queue }: TransportBarProps) {
 
   const handleClear = async () => {
     setClearing(true);
-    const prev = queue;
-    if (prev) setOptimistic('queue', { ...prev, songs: [] });
     try {
       await api.clearQueue();
       showToast('Queue cleared', 'success');
       setConfirmClear(false);
     } catch (err) {
-      if (prev) setOptimistic('queue', prev); // roll back
       showToast(err instanceof Error ? err.message : 'Failed to clear queue', 'error');
     } finally {
       setClearing(false);
@@ -77,7 +78,7 @@ export function TransportBar({ queue }: TransportBarProps) {
             <ControlButton
               icon="skip"
               label="Skip"
-              onClick={() => run('skip', api.skipSong, 'Skipped to next song', (q) => ({ ...q, is_playing: q.is_playing || q.is_paused }))}
+              onClick={() => run('skip', api.skipSong, 'Skipped to next song')}
               busy={busy === 'skip'}
             />
             <button

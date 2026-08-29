@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from backend.domain.models.song import Song
 
@@ -31,8 +30,4 @@ class MediaPlayerService(ABC):
 
     @abstractmethod
     def is_paused(self) -> bool:
-        pass
-
-    @abstractmethod
-    def get_current_song(self) -> Optional[Song]:
         pass

@@ -24,10 +24,11 @@ export default function QueuePage() {
   const [randomBusy, setRandomBusy] = useState(false);
   const { showToast } = useToast();
 
-  // Fallback poll if the websocket never connects, so the queue page still
-  // renders even when the socket is unavailable.
+  // Fallback poll if the socket is not delivering (never connected, or
+  // dropped), so the queue page still renders even when the socket is down.
+  // It stops the moment live events are flowing again.
   useEffect(() => {
-    if (bot.hasSnapshot) return;
+    if (bot.connected && bot.hasSnapshot) return;
     let cancelled = false;
     const load = async () => {
       if (cancelled) return;
@@ -45,29 +46,19 @@ export default function QueuePage() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [bot.hasSnapshot]);
+  }, [bot.connected, bot.hasSnapshot]);
 
   const loading = !bot.hasSnapshot && queue === null;
 
   const handleAddSong = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url.trim()) return;
-    const prev = queue;
     setAdding(true);
     try {
-      // Optimistic: bump the queue length locally so the "N tracks" chip and
-      // the list feel instant. The server publishes the authoritative queue
-      // over the socket and reconciles (the exact new song title appears as
-      // soon as it round-trips).
-      if (prev) {
-        setOptimistic('queue', { ...prev, songs: [...prev.songs, { id: `pending-${Date.now()}`, title: url.trim(), length: 0, origin: url.trim() }] });
-      }
       await api.addSong(url.trim());
       showToast('Song added to queue', 'success');
       setUrl('');
     } catch (err) {
-      // Roll back the optimistic row if the server rejected the add.
-      if (prev) setOptimistic('queue', prev);
       showToast(err instanceof Error ? err.message : 'Failed to add song', 'error');
     } finally {
       setAdding(false);
@@ -161,7 +152,7 @@ export default function QueuePage() {
           {songCount > 0 ? (
             <div className="divide-y divide-white/[0.05]">
               {queue!.songs.map((song, i) => (
-                <QueueRow key={song.id} song={song} index={i + 1} />
+                <QueueRow key={`${i}-${song.id}`} song={song} index={i + 1} />
               ))}
             </div>
           ) : (

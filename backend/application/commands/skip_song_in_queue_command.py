@@ -16,6 +16,12 @@ class SkipSongInQueueCommandHandler(RequestHandler[SkipSongInQueueCommand, None]
 
     def handle(self, request: SkipSongInQueueCommand) -> None:
         queue_state = self.__context_manager_service.get_queue_state()
-        queue_state.skip()
+        # Remember what the user just skipped so repeat mode (which normally
+        # re-plays the last track on song end) does not bring it back — a
+        # skip means "do not come back to this one".
+        queue_state.skip_excluding(queue_state.get_last_song())
 
+        # Advancing to the next track (which also records it as the current
+        # one) is the *only* state change: the previously playing song simply
+        # leaves the "current" slot.
         self.__media_player_service.next()

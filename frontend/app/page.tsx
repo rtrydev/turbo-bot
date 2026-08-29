@@ -21,11 +21,12 @@ export default function Dashboard() {
   const bot = useBotSocket();
   const { queue, status } = bot;
 
-  // Fallback: if the websocket never delivers a snapshot (blocked, offline,
-  // etc.) poll the REST API and push the result into the shared socket state.
-  // This is a safety net only — the socket is the primary, push-based source.
+  // Fallback: if the socket is not currently delivering (never connected,
+  // or dropped) poll the REST API and push the result into the shared
+  // socket state. The socket is the primary, push-based source; this is a
+  // safety net only, so it stops the moment live events are flowing again.
   useEffect(() => {
-    if (bot.hasSnapshot) return;
+    if (bot.connected && bot.hasSnapshot) return;
     let cancelled = false;
     const load = async () => {
       if (cancelled) return;
@@ -44,7 +45,7 @@ export default function Dashboard() {
       cancelled = true;
       clearInterval(id);
     };
-  }, [bot.hasSnapshot]);
+  }, [bot.connected, bot.hasSnapshot]);
 
   // The skeleton is purely a function of whether we have data yet — no
   // effect-driven setState needed.
@@ -192,7 +193,7 @@ function UpNextCard({ queue }: { queue: QueueStateDTO | null }) {
         <>
           <div className="divide-y divide-white/[0.05]">
             {songs.slice(0, 5).map((song, i) => (
-              <div key={song.id} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.03]">
+              <div key={`${i}-${song.id}`} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-white/[0.03]">
                 <span className="w-5 text-right font-mono text-[11px] text-zinc-600">{i + 1}</span>
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06]">
                   <Icon name="music" className="h-3.5 w-3.5 text-zinc-400" />

@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import asdict, is_dataclass
-from typing import Any
+from typing import Any, Callable
 
 import aiohttp
 from aiohttp import web
@@ -17,9 +17,11 @@ from backend.application.commands.start_queue_playback_command import StartQueue
 from backend.application.commands.toggle_repeat_command import ToggleRepeatCommand
 from backend.application.queries.get_connection_status_query import GetConnectionStatusQuery
 from backend.application.queries.get_queue_state_query import GetQueueStateQuery
+from backend.domain.services.context_manager_service import ContextManagerService
 from backend.application.queries.list_songs_query import ListSongsQuery
 from backend.application.utils.mediator import Mediator
 from backend.ports.api.ws_hub import EVENT_LIBRARY, EVENT_QUEUE, EVENT_STATUS, EVENT_PING, Hub
+from backend.service.dependency_injection import container
 
 
 def serialize(obj: Any) -> Any:
@@ -28,11 +30,37 @@ def serialize(obj: Any) -> Any:
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
+def _queue_listener_factory(app: web.Application) -> Callable[[], None]:
+    """Build a queue observer that pushes the fresh state to all WS clients.
+
+    The observer is fired synchronously by the :class:`SongQueue` from the
+    thread that mutated it — an aiohttp handler, a Discord command, or the
+    audio-player thread — so it hops onto the app's event loop with
+    ``run_coroutine_threadsafe`` and never blocks the mutation.
+    """
+    def listener() -> None:
+        # Get the running loop from the current thread's context. If we're
+        # already on the event loop (e.g. called from an aiohttp handler),
+        # schedule the coroutine directly. If we're on another thread, use
+        # run_coroutine_threadsafe.
+        try:
+            loop = asyncio.get_running_loop()
+            asyncio.ensure_future(publish_queue(app), loop=loop)
+        except RuntimeError:
+            # No running loop on this thread — find the app's loop.
+            app_loop = getattr(app, '_loop', None)
+            if app_loop is not None:
+                asyncio.run_coroutine_threadsafe(publish_queue(app), app_loop)
+            # else: app not started or shutting down, nothing to do
+
+    return listener
+
+
 async def publish_queue(app: web.Application) -> None:
     """Push the current queue state to every subscribed client.
 
-    Failures are swallowed — the UI falls back to polling, so a transient
-    error reading state must never break a websocket fan-out.
+    Failures are swallowed — a transient error reading state must never
+    break a websocket fan-out.
     """
     try:
         state = serialize(app['mediator'].send(GetQueueStateQuery()))
@@ -79,6 +107,16 @@ def create_app(mediator: Mediator) -> web.Application:
     app = web.Application(middlewares=[cors_middleware])
     app['mediator'] = mediator
     app['hub'] = Hub()
+
+    # Subscribe the hub to *every* queue mutation — including advances that
+    # happen inside the audio player when a song finishes, where no API
+    # handler runs. The queue object is process-local (the in-memory context
+    # manager), so this covers all mutation paths in one place.
+    try:
+        context_manager = container.resolve(ContextManagerService)
+        context_manager.add_queue_listener(_queue_listener_factory(app))
+    except Exception:  # noqa: BLE001 - queue events are a no-op without one
+        pass
 
     app.router.add_get('/ws', websocket_handler)
     app.router.add_get('/api/status', get_status)
@@ -208,8 +246,6 @@ async def add_song_to_queue(request: web.Request) -> web.Response:
         mediator = request.app['mediator']
         mediator.send(CreateSongCommand(origin=origin))
         mediator.send(AddSongToQueueCommand(origin=origin))
-
-        await publish_queue(request.app)
         return web.json_response({'message': 'Song added successfully'})
     except ValueError as e:
         return web.json_response({'error': str(e)}, status=404)
@@ -223,8 +259,6 @@ async def add_random_songs(request: web.Request) -> web.Response:
         count = body.get('count', 10)
 
         request.app['mediator'].send(AddRandomSongsToQueueCommand(count=count))
-
-        await publish_queue(request.app)
         return web.json_response({'message': f'Added {count} random songs to the queue'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -233,7 +267,6 @@ async def add_random_songs(request: web.Request) -> web.Response:
 async def clear_queue(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(ClearQueueCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Queue cleared'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -242,7 +275,6 @@ async def clear_queue(request: web.Request) -> web.Response:
 async def start_playback(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(StartQueuePlaybackCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Playback started'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -251,7 +283,6 @@ async def start_playback(request: web.Request) -> web.Response:
 async def pause_playback(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(PauseSongCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Playback paused'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -260,7 +291,6 @@ async def pause_playback(request: web.Request) -> web.Response:
 async def resume_playback(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(ResumeSongCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Playback resumed'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -269,7 +299,6 @@ async def resume_playback(request: web.Request) -> web.Response:
 async def skip_song(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(SkipSongInQueueCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Skipped to next song'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
@@ -278,7 +307,6 @@ async def skip_song(request: web.Request) -> web.Response:
 async def toggle_repeat(request: web.Request) -> web.Response:
     try:
         request.app['mediator'].send(ToggleRepeatCommand())
-        await publish_queue(request.app)
         return web.json_response({'message': 'Toggled repeat mode'})
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)

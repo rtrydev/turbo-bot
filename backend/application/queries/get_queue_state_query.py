@@ -8,6 +8,10 @@ from backend.domain.services.context_manager_service import ContextManagerServic
 from backend.domain.services.media_player_service import MediaPlayerService
 
 
+def _song_dto(song) -> SongDTO:
+    return SongDTO(id=song.id, title=song.title, length=song.length, origin=song.origin)
+
+
 @dataclass
 class GetQueueStateQuery(Request[Optional[QueueStateDTO]]):
     pass
@@ -23,12 +27,22 @@ class GetQueueStateQueryHandler(RequestHandler[GetQueueStateQuery, Optional[Queu
 
     def handle(self, request: GetQueueStateQuery) -> Optional[QueueStateDTO]:
         queue = self.__context_manager_service.get_queue_state()
-        current_song = self.__media_player_service.get_current_song()
+        player = self.__media_player_service
+
+        # The "now playing" slot mirrors what the player actually has loaded,
+        # and only while audio is alive in the channel. Once playback stops
+        # (song finished, channel left, bot stopped) the slot is empty even
+        # if a track was the last one advanced — the UI then shows a stopped
+        # state, not a ghost of a track that is no longer playing.
+        currently_playing = None
+        if player.is_playing() or player.is_paused():
+            last_song = queue.get_last_song()
+            currently_playing = _song_dto(last_song) if last_song else None
 
         return QueueStateDTO(
-            songs=[SongDTO(id=s.id, title=s.title, length=s.length, origin=s.origin) for s in queue.get_all()],
-            currently_playing=SongDTO(id=current_song.id, title=current_song.title, length=current_song.length, origin=current_song.origin) if current_song else None,
-            is_playing=self.__media_player_service.is_playing(),
-            is_paused=self.__media_player_service.is_paused(),
+            songs=[_song_dto(s) for s in queue.get_all()],
+            currently_playing=currently_playing,
+            is_playing=player.is_playing(),
+            is_paused=player.is_paused(),
             repeat_enabled=queue.is_repeat_enabled()
         )

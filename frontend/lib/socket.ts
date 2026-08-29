@@ -13,11 +13,20 @@ import type { BotEvent, ConnectionStatusDTO, QueueStateDTO, SongsListResponseDTO
  * subscribers, so opening the dashboard, the queue and the library page
  * does not multiply the number of connections.
  *
- * On connect the server sends a `snapshot` event; the client applies it so a
- * fresh tab is correct immediately and never waits for the first mutation.
- * After that, change events keep the local state in sync. If the socket drops
- * we reconnect with exponential backoff, and any page can also poll as a
- * fallback (see the pages) so a broken socket never leaves stale data.
+ * The socket is the *authoritative* live channel:
+ *
+ * - On connect the server sends a `snapshot` event; the client applies it
+ *   so a fresh tab is correct immediately and never waits for the first
+ *   mutation.
+ * - The server pushes a full `queue` event after **every** queue mutation —
+ *   API-driven ones (add, skip, clear, repeat…) and player-driven ones (a
+ *   song finishing on its own) — so the local copy always converges to the
+ *   real state without any client-side bookkeeping.
+ *
+ * If the socket drops we reconnect with exponential backoff and re-apply the
+ * snapshot when it comes back. Any page can additionally poll the REST API
+ * as a last resort (see the pages); such polls are gated on the socket being
+ * down, so they never race or fight the pushed events.
  */
 
 type Listener = () => void;
@@ -46,17 +55,13 @@ let ws: WebSocket | null = null;
 let attempt = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-// --- Optimistic updates ----------------------------------------------------
+// --- Client-side action feedback ------------------------------------------
 //
 // A client-side action (play, skip, add-to-queue …) is reflected in the UI
 // immediately, before the server round-trips. The server publishes the new
-// authoritative state over the socket right after the mutation, so the socket
-// event overwrites the optimistic value and reconciles the UI. If the request
+// authoritative state over the socket right after the mutation, which
+// overwrites the optimistic value and reconciles the UI. If the request
 // fails the caller re-applies the pre-mutation snapshot to roll the UI back.
-//
-// The optimistic value and the socket value live in the same `state` object, so
-// subscribers see the optimistic value the moment it is applied and the server
-// value the moment it arrives — no separate override bookkeeping needed.
 type OverrideKey = 'queue' | 'status' | 'library';
 
 export function setOptimistic(key: OverrideKey, value: unknown) {
@@ -91,6 +96,8 @@ function applyEvent(raw: string) {
       });
       break;
     case 'queue':
+      // Server state after a mutation (or a song finishing): always
+      // authoritative, applied as-is.
       setState({ queue: msg.data, lastEventAt: Date.now() });
       break;
     case 'status':
@@ -147,6 +154,10 @@ function open() {
     };
 
     socket.onclose = () => {
+      // We may have missed events while disconnected; forget that we ever
+      // had a snapshot so the polling fallbacks on the pages kick in and the
+      // UI recovers even if the socket never comes back.
+      setState({ connected: false, hasSnapshot: false });
       if (listeners.size > 0) {
         scheduleReconnect();
       }
