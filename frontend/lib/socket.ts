@@ -61,7 +61,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 // immediately, before the server round-trips. The server publishes the new
 // authoritative state over the socket right after the mutation, which
 // overwrites the optimistic value and reconciles the UI. If the request
-// fails the caller re-applies the pre-mutation snapshot to roll the UI back.
+// fails, the caller re-applies the pre-mutation snapshot to roll the UI back.
 type OverrideKey = 'queue' | 'status' | 'library';
 
 export function setOptimistic(key: OverrideKey, value: unknown) {

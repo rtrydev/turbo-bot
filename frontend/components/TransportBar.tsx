@@ -20,12 +20,10 @@ export function TransportBar({ queue }: TransportBarProps) {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
 
-  // Issue the transport action and wait for the server's authoritative
-  // queue event over the socket to update the UI. Optimistic guessing is
-  // deliberately avoided for actions that mutate queue *contents* (skip,
-  // play, clear): the server state is always more correct than a local
-  // approximation, and applying a wrong guess and rolling it back is exactly
-  // the flicker/duplication the user would see otherwise.
+  // Apply a local approximation of the action first, then issue the REST
+  // call. The socket's authoritative `queue` event reconciles the UI once it
+  // arrives; if the request fails we roll the optimistic state back to the
+  // pre-mutation snapshot.
   const run = async (
     key: string,
     fn: () => Promise<unknown>,
@@ -33,11 +31,13 @@ export function TransportBar({ queue }: TransportBarProps) {
     apply?: (q: QueueStateDTO) => QueueStateDTO,
   ) => {
     setBusy(key);
+    const previousQueue = queue;
+    if (apply && previousQueue) setOptimistic('queue', apply(previousQueue));
     try {
       await fn();
       showToast(ok, 'success');
-      if (apply) setOptimistic('queue', apply(queue!));
     } catch (err) {
+      if (apply && previousQueue) setOptimistic('queue', previousQueue);
       showToast(err instanceof Error ? err.message : 'Action failed', 'error');
     } finally {
       setBusy(null);
@@ -47,6 +47,16 @@ export function TransportBar({ queue }: TransportBarProps) {
   const isPlaying = queue?.is_playing ?? false;
   const isPaused = queue?.is_paused ?? false;
   const queueLength = queue?.songs.length ?? 0;
+
+  // Approximate the server's skip: the first queued track becomes the
+  // now-playing slot. (Repeat mode re-queues the previous track on the
+  // backend, but a manual skip is always excluded from repeat, so the queued
+  // list itself is unaffected.)
+  const optimisticSkip = (q: QueueStateDTO): QueueStateDTO => {
+    if (q.songs.length === 0 || q.currently_playing === null) return q;
+    const [head, ...rest] = q.songs;
+    return { ...q, currently_playing: head, songs: rest };
+  };
 
   // The server publishes the authoritative state right after the mutation;
   // we just mirror the transport flags (a pure flag flip, no queue content
@@ -78,7 +88,7 @@ export function TransportBar({ queue }: TransportBarProps) {
             <ControlButton
               icon="skip"
               label="Skip"
-              onClick={() => run('skip', api.skipSong, 'Skipped to next song')}
+              onClick={() => run('skip', api.skipSong, 'Skipped to next song', optimisticSkip)}
               busy={busy === 'skip'}
             />
             <button
