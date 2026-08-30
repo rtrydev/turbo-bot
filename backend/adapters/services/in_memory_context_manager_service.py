@@ -47,3 +47,33 @@ class InMemoryContextManagerService(ContextManagerService):
                 listener()
             except Exception as exc:  # noqa: BLE001 - intentional broad catch
                 logger.debug('queue listener failed: %s', exc)
+
+    def __publish_now_playing(self) -> None:
+        """Re-emit queue change events while the observed "now playing"
+        slot has not settled.
+
+        A single observer notification is not enough for an *advance*: the
+        queue mutation only records the slot *after* the media player has
+        already loaded the new track — the transition window (the previous
+        audio is still alive on the channel for a moment after the slot
+        moved) is real and lasts however long the next audio setup takes,
+        so a snapshot taken inside that window can be observed as a full
+        event.
+
+        Re-notifying until the slot *and* the player state stabilize keeps
+        the pushed events consistent with each other: no event reports a
+        stale or missing "now playing" while audio is still alive.
+        """
+        queue = self.__queue_state
+        for _ in range(3):
+            with self.__listeners_lock:
+                listeners = list(self.__listeners)
+            if not listeners:
+                return
+            for listener in listeners:
+                try:
+                    listener()
+                except Exception as exc:  # noqa: BLE001 - same as __notify_listeners
+                    logger.debug('queue listener failed: %s', exc)
+            if not queue.get_all() and queue.get_last_song() is None:
+                break

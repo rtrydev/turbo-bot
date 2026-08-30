@@ -75,6 +75,9 @@ class DiscordMediaPlayerService(MediaPlayerService):
 
         channel = self.__channel_connection_provider.get_channel_connection()
 
+        if channel is None:
+            raise Exception('No active voice channel to play into.')
+
         self._current_playback_id += 1
         my_playback_id = self._current_playback_id
 
@@ -130,10 +133,14 @@ class DiscordMediaPlayerService(MediaPlayerService):
 
     def pause(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
+        if channel is None:
+            raise Exception('No active voice channel to pause.')
         channel.pause()
 
     def resume(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
+        if channel is None:
+            raise Exception('No active voice channel to resume.')
         channel.resume()
 
     @staticmethod
