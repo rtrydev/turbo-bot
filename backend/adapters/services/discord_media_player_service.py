@@ -64,6 +64,10 @@ class DiscordMediaPlayerService(MediaPlayerService):
         self.__context_manager_service = context_manager_service
         self.__song_repository = song_repository
         self._next_lock = threading.Lock()
+        # True from the moment a track starts until the session genuinely
+        # ends (stop, or the queue runs out). See :meth:`is_playing` for why
+        # the reported state is session-based rather than channel-based.
+        self._in_session = False
 
     def play(self, song: Song) -> None:
         if not self._next_lock.acquire(blocking=False):
@@ -150,6 +154,7 @@ class DiscordMediaPlayerService(MediaPlayerService):
                 channel.stop()
             channel.play(source, after=after_callback)
 
+        self._in_session = True
         self._arm_watchdog()
 
     def pause(self) -> None:
@@ -194,6 +199,8 @@ class DiscordMediaPlayerService(MediaPlayerService):
             DiscordMediaPlayerService._kill_source(channel.source)
 
     def stop(self) -> None:
+        self._in_session = False
+
         channel = self.__channel_connection_provider.get_channel_connection()
         if channel is not None:
             self._kill_ffmpeg(channel)
@@ -231,6 +238,9 @@ class DiscordMediaPlayerService(MediaPlayerService):
             self._kill_ffmpeg(channel)
             channel.stop()
 
+        # Nothing left to play: the session is over.
+        self._in_session = False
+
     def _arm_watchdog(self) -> None:
         """Watch the *currently attached* source for a real stall.
 
@@ -263,9 +273,23 @@ class DiscordMediaPlayerService(MediaPlayerService):
         threading.Timer(WATCHDOG_CHECK_INTERVAL, watchdog).start()
 
     def is_playing(self) -> bool:
+        # Session-level, deliberately *not* the channel's flag: discord.py's
+        # AudioPlayer exits the moment its source is exhausted, so after a
+        # natural track end the channel is dead (and silent) while the next
+        # source is being downloaded — until channel.play() restarts the
+        # player. Reporting the channel flag verbatim would make the UI flip
+        # to "stopped" on every transition. Within a live session the flag
+        # means "a session is running and not paused", which is what the
+        # "now playing" presentation is about.
+        if not self._in_session:
+            return False
+
         channel = self.__channel_connection_provider.get_channel_connection()
-        return channel is not None and channel.is_playing()
+        return channel is not None and not channel.is_paused()
 
     def is_paused(self) -> bool:
+        if not self._in_session:
+            return False
+
         channel = self.__channel_connection_provider.get_channel_connection()
         return channel is not None and channel.is_paused()
