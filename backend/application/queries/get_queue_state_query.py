@@ -29,13 +29,22 @@ class GetQueueStateQueryHandler(RequestHandler[GetQueueStateQuery, Optional[Queu
         queue = self.__context_manager_service.get_queue_state()
         player = self.__media_player_service
 
-        # The "now playing" slot mirrors what the player actually has loaded,
-        # and only while audio is alive in the channel. Once playback stops
-        # (song finished, channel left, bot stopped) the slot is empty even
-        # if a track was the last one advanced — the UI then shows a stopped
-        # state, not a ghost of a track that is no longer playing.
+        # The "now playing" slot is authoritative while a session is running:
+        # the player advances the slot *first* and then swaps the channel's
+        # source in place, so between the two the slot already points at the
+        # next track — the one about to play — and that must be what the UI
+        # shows (mirroring what is about to be audible, never a gap).
+        #
+        # The slot is only discarded on a *genuine* stop — the queue is
+        # empty and nothing is playing or paused (a session truly over).
+        # During a transition the queue still holds tracks, so the slot
+        # survives; and every stop path that empties the slot also empties
+        # the queue, so a stale ghost cannot outlive the session that played
+        # it.
         currently_playing = None
-        if player.is_playing() or player.is_paused():
+        if not queue.get_all() and not (player.is_playing() or player.is_paused()):
+            currently_playing = None
+        else:
             last_song = queue.get_last_song()
             currently_playing = _song_dto(last_song) if last_song else None
 

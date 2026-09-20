@@ -21,6 +21,9 @@ class WatchdogFFmpegOpusAudio(discord.FFmpegOpusAudio):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._last_frame_time = time.monotonic()
+        #: Path of the temp .opus file backing this source (if any); the
+        #: owner unlinks it when the source is retired.
+        self.temp_file_name: Optional[str] = None
 
     def read(self) -> bytes:
         data = super().read()
@@ -50,6 +53,7 @@ class GeneratorAudioSource(discord.AudioSource):
     def cleanup(self):
         self.closed = True
 
+
 class DiscordMediaPlayerService(MediaPlayerService):
     __channel_connection_provider: ChannelConnectionProvider
     __context_manager_service: ContextManagerService
@@ -60,9 +64,23 @@ class DiscordMediaPlayerService(MediaPlayerService):
         self.__context_manager_service = context_manager_service
         self.__song_repository = song_repository
         self._next_lock = threading.Lock()
-        self._current_playback_id = 0
 
     def play(self, song: Song) -> None:
+        if not self._next_lock.acquire(blocking=False):
+            return
+
+        try:
+            self._play_song(song, in_place=True)
+        finally:
+            self._next_lock.release()
+
+    def _prepare_source(self, song: Song) -> WatchdogFFmpegOpusAudio:
+        """Build the opus source for ``song``, downloading audio if needed.
+
+        This is the slow part (seconds on an un-cached stream), and it runs
+        while a *different* track is still playing on the channel, so it must
+        not be confused with a stall of the current playback.
+        """
         if song.fid is None:
             db_song = self.__song_repository.get_by_id(song.id)
             song.fid = db_song.fid
@@ -73,14 +91,6 @@ class DiscordMediaPlayerService(MediaPlayerService):
         if audio_stream is None:
             raise Exception(f'Audio stream for song {song.id} could not be created!')
 
-        channel = self.__channel_connection_provider.get_channel_connection()
-
-        if channel is None:
-            raise Exception('No active voice channel to play into.')
-
-        self._current_playback_id += 1
-        my_playback_id = self._current_playback_id
-
         temp_file = tempfile.NamedTemporaryFile(suffix='.opus', delete=False)
         temp_file_name = temp_file.name
 
@@ -90,46 +100,57 @@ class DiscordMediaPlayerService(MediaPlayerService):
         temp_file.flush()
         temp_file.close()
 
-        watchdog_timer: list[Optional[threading.Timer]] = [None]
-
-        def after_callback(error):
-            if watchdog_timer[0] is not None:
-                watchdog_timer[0].cancel()
-            try:
-                os.unlink(temp_file_name)
-            except OSError:
-                pass
-
-            if self._current_playback_id == my_playback_id:
-                self.next()
-
         source = WatchdogFFmpegOpusAudio(
             temp_file_name,
             options='-af loudnorm=I=-14:TP=-1.5:LRA=11'
         )
-        channel.play(source, after=after_callback)
+        source.temp_file_name = temp_file_name
+        return source
 
-        def watchdog():
-            ch = self.__channel_connection_provider.get_channel_connection()
-            if ch is None or not (ch.is_playing() or ch.is_paused()):
-                return
+    def _play_song(self, song: Song, *, in_place: bool) -> None:
+        channel = self.__channel_connection_provider.get_channel_connection()
 
-            if ch.is_paused():
-                watchdog_timer[0] = threading.Timer(WATCHDOG_CHECK_INTERVAL, watchdog)
-                watchdog_timer[0].start()
-                return
+        if channel is None:
+            raise Exception('No active voice channel to play into.')
 
-            if isinstance(ch.source, WatchdogFFmpegOpusAudio):
-                if ch.source.seconds_since_last_frame() > STALL_TIMEOUT:
-                    self._kill_ffmpeg(ch)
-                    ch.stop()
-                    return
+        # Prepare *before* touching the channel: with ``in_place`` the current
+        # track must keep playing (audibly) for the whole prep; otherwise we
+        # would briefly silence a track the user asked to hear.
+        source = self._prepare_source(song)
 
-            watchdog_timer[0] = threading.Timer(WATCHDOG_CHECK_INTERVAL, watchdog)
-            watchdog_timer[0].start()
+        def after_callback(error):
+            if self._next_lock.acquire(blocking=False):
+                try:
+                    # The attached source just finished: free its temp file
+                    # (its ffmpeg process already exited) before advancing.
+                    self._release_channel_source()
+                    self._advance()
+                finally:
+                    self._next_lock.release()
 
-        watchdog_timer[0] = threading.Timer(WATCHDOG_CHECK_INTERVAL, watchdog)
-        watchdog_timer[0].start()
+        playing = channel.is_playing() or channel.is_paused()
+
+        if in_place and playing:
+            # Keep the same AudioPlayer running: a source swap never creates
+            # an "is not playing" gap on the channel, so the queue's
+            # "now playing" slot (which mirrors the queue state, not the
+            # channel flags) stays consistent with what is audible.
+            old_source = channel.source
+            channel.source = source
+            # The old source will never be read again — retire it here, while
+            # we still hold a reference to it (the channel no longer does).
+            self._kill_source(old_source)
+        else:
+            # A genuine (re)start: with the AudioPlayer stopped, assigning
+            # ``channel.source`` alone would start *nothing*, so this path
+            # must go through channel.play(), which also registers the
+            # advance callback for when this source finishes.
+            if playing:
+                self._kill_ffmpeg(channel)
+                channel.stop()
+            channel.play(source, after=after_callback)
+
+        self._arm_watchdog()
 
     def pause(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
@@ -145,35 +166,101 @@ class DiscordMediaPlayerService(MediaPlayerService):
 
     @staticmethod
     def _kill_ffmpeg(channel) -> None:
-        source = channel.source
-        if isinstance(source, WatchdogFFmpegOpusAudio):
-            proc = source._process
-            if proc is not None and proc.poll() is None:
+        DiscordMediaPlayerService._kill_source(channel.source)
+
+    @staticmethod
+    def _kill_source(source) -> None:
+        """Stop a source's ffmpeg process and delete its temp .opus file."""
+        if not isinstance(source, WatchdogFFmpegOpusAudio):
+            return
+
+        proc = source._process
+        if proc is not None:
+            if proc.poll() is None:
                 proc.kill()
+            # Wait for the handle to be released so the unlink below cannot
+            # race with the still-open file.
+            proc.wait()
+
+        if source.temp_file_name is not None:
+            try:
+                os.unlink(source.temp_file_name)
+            except OSError:
+                pass
+
+    def _release_channel_source(self) -> None:
+        channel = self.__channel_connection_provider.get_channel_connection()
+        if channel is not None:
+            DiscordMediaPlayerService._kill_source(channel.source)
 
     def stop(self) -> None:
         channel = self.__channel_connection_provider.get_channel_connection()
         if channel is not None:
             self._kill_ffmpeg(channel)
-        channel.stop()
+            channel.stop()
 
     def next(self) -> None:
         if not self._next_lock.acquire(blocking=False):
             return
 
         try:
-            channel = self.__channel_connection_provider.get_channel_connection()
-
-            if channel is not None and (channel.is_playing() or channel.is_paused()):
-                self._kill_ffmpeg(channel)
-                channel.stop()
-
-            next_song = self.__context_manager_service.get_queue_state().get_next()
-
-            if next_song:
-                self.play(next_song)
+            self._advance()
         finally:
             self._next_lock.release()
+
+    def _advance(self) -> None:
+        """Move on from the finished/abandoned current track.
+
+        Order matters: the slot is advanced *first*, while the channel still
+        reports the finished track as playing — the slot mirrors the queue
+        state, and the previous track is audibly gone the moment its source
+        is swapped out. Swapping first would expose a gap where the channel
+        reports "not playing" while the slot still points at the finished
+        track, which the admin view would render as "nothing playing" even
+        though music kept going.
+        """
+        channel = self.__channel_connection_provider.get_channel_connection()
+
+        next_song = self.__context_manager_service.get_queue_state().get_next()
+
+        if next_song:
+            self._play_song(next_song, in_place=True)
+            return
+
+        if channel is not None and (channel.is_playing() or channel.is_paused()):
+            self._kill_ffmpeg(channel)
+            channel.stop()
+
+    def _arm_watchdog(self) -> None:
+        """Watch the *currently attached* source for a real stall.
+
+        The check is scoped to the exact source instance that is playing:
+        preparing the *next* track's source (download/decode can take
+        seconds) never moves the current source's frame clock, and a source
+        that is about to be swapped out — or already was — is never treated
+        as the stale one. Without that scope the watchdog kills a healthy
+        transition, which shows up as the channel going silent on every
+        song change.
+        """
+        def watchdog():
+            ch = self.__channel_connection_provider.get_channel_connection()
+            if ch is None or not (ch.is_playing() or ch.is_paused()):
+                return
+
+            if ch.is_paused():
+                self._arm_watchdog()
+                return
+
+            source = ch.source
+            if isinstance(source, WatchdogFFmpegOpusAudio):
+                if source.seconds_since_last_frame() > STALL_TIMEOUT:
+                    self._kill_ffmpeg(ch)
+                    ch.stop()
+                    return
+
+            self._arm_watchdog()
+
+        threading.Timer(WATCHDOG_CHECK_INTERVAL, watchdog).start()
 
     def is_playing(self) -> bool:
         channel = self.__channel_connection_provider.get_channel_connection()
